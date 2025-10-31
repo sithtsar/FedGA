@@ -118,5 +118,5 @@ Thumbs.db
 
 # Project specific
 data/
-*.png
-results.png
+!*.png
+!results.png
