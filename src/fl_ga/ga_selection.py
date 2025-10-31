@@ -14,14 +14,32 @@ def tournament_selection(population, fitnesses, tournament_size=3):
     return selected
 
 
-def crossover(parent1, parent2, p_c):
+def repair_chromosome(chrom, num_clients):
     """
-    Single-point crossover.
+    Repair chromosome to ensure unique values.
+    """
+    seen = set()
+    for i in range(len(chrom)):
+        if chrom[i] in seen:
+            available = set(range(num_clients)) - seen - set(chrom[i+1:])
+            if available:
+                chrom[i] = np.random.choice(list(available))
+            else:
+                # Fallback, though unlikely
+                chrom[i] = (chrom[i] + 1) % num_clients
+        seen.add(chrom[i])
+    return chrom
+
+def crossover(parent1, parent2, p_c, num_clients):
+    """
+    Single-point crossover with repair.
     """
     if np.random.rand() < p_c:
         point = np.random.randint(1, len(parent1))
         child1 = parent1[:point] + parent2[point:]
         child2 = parent2[:point] + parent1[point:]
+        child1 = repair_chromosome(child1, num_clients)
+        child2 = repair_chromosome(child2, num_clients)
         return child1, child2
     return parent1, parent2
 
@@ -82,7 +100,7 @@ def ga_client_selection(
         for i in range(0, len(selected), 2):
             p1 = selected[i]
             p2 = selected[i + 1] if i + 1 < len(selected) else selected[0]
-            c1, c2 = crossover(p1, p2, p_c)
+            c1, c2 = crossover(p1, p2, p_c, num_clients)
             new_population.extend([c1, c2])
 
         # Mutation
