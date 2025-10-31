@@ -9,6 +9,7 @@ dependencies = [
     "matplotlib",
     "scikit-learn",
     "pytest",
+    "ruff",
 ]
 requires-python = ">=3.8"
 
