@@ -8,12 +8,19 @@ import numpy as np
 import torch
 from .config import FLConfig
 from .data_loader import load_mnist
-from .fl_base import evaluate, fedavg_aggregate, genfed_aggregate, get_rho_t, train_local
+from .fl_base import (
+    evaluate,
+    fedavg_aggregate,
+    genfed_aggregate,
+    get_rho_t,
+    train_local,
+)
 from .ga_selection import ga_client_selection
 from .model import create_model
 
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
 
@@ -61,7 +68,14 @@ def main(config: FLConfig = None):
     local_accs = []
     for i in range(config.num_clients):
         local_model = copy.deepcopy(global_model_fedcsga)
-        trained = train_local(local_model, client_datasets[i], config.epochs, config.lr, config.batch_size, config.device)
+        trained = train_local(
+            local_model,
+            client_datasets[i],
+            config.epochs,
+            config.lr,
+            config.batch_size,
+            config.device,
+        )
         acc, _ = evaluate(trained, client_datasets[i], config.device)
         local_accs.append(acc)
     logging.info(f"Local accuracies computed: {local_accs}")
@@ -74,66 +88,109 @@ def main(config: FLConfig = None):
     genfed_acc = []
     genfed_loss = []
     round_times = []
+    baseline_times = []
+    fedcsga_times = []
+    genfed_times = []
     baseline_selections = []
     fedcsga_selections = []
     genfed_selections = []
 
     for round_num in range(config.rounds):
-        start_time = time.time()
         logging.info(f"Starting Round {round_num + 1}/{config.rounds}")
 
         # Baseline: Random selection + FedAvg
+        start_time = time.time()
         selected = np.random.choice(config.num_clients, config.k, replace=False)
         baseline_selections.append(selected.tolist())
         logging.info(f"FedAvg Baseline: Selected clients {selected}")
         local_models = [
             train_local(
-                copy.deepcopy(global_model_base), client_datasets[i], config.epochs, config.lr, config.batch_size, config.device,
+                copy.deepcopy(global_model_base),
+                client_datasets[i],
+                config.epochs,
+                config.lr,
+                config.batch_size,
+                config.device,
             )
             for i in selected
         ]
         global_model_base = fedavg_aggregate(
-            local_models, [client_datasets[i] for i in selected], config.device,
+            local_models,
+            [client_datasets[i] for i in selected],
+            config.device,
         )
         acc, loss = evaluate(global_model_base, test_dataset, config.device)
         baseline_acc.append(acc)
         baseline_loss.append(loss)
-        logging.info(f"FedAvg Baseline: Accuracy {acc:.4f}, Loss {loss:.4f}")
+        baseline_time = time.time() - start_time
+        baseline_times.append(baseline_time)
+        logging.info(
+            f"FedAvg Baseline: Accuracy {acc:.4f}, Loss {loss:.4f}, Time {baseline_time:.2f}s"
+        )
         # Checkpoint
         if (round_num + 1) % 10 == 0 or round_num == config.rounds - 1:
-            torch.save(global_model_base.state_dict(), f"checkpoints/round_{round_num+1}_baseline.pth")
+            torch.save(
+                global_model_base.state_dict(),
+                f"checkpoints/round_{round_num + 1}_baseline.pth",
+            )
 
         # FedCSGA: GA selection + FedAvg
+        start_time = time.time()
         selected = ga_client_selection(
-            config.num_clients, config.k, config.pop_size, config.generations,
-            local_accs=local_accs, adaptive=config.adaptive, tournament_size=config.tournament_size
+            config.num_clients,
+            config.k,
+            config.pop_size,
+            config.generations,
+            local_accs=local_accs,
+            adaptive=config.adaptive,
+            tournament_size=config.tournament_size,
         )
         fedcsga_selections.append(selected)
         logging.info(f"FedCSGA (GA Selection + FedAvg): Selected clients {selected}")
         local_models = [
             train_local(
-                copy.deepcopy(global_model_fedcsga), client_datasets[i], config.epochs, config.lr, config.batch_size, config.device,
+                copy.deepcopy(global_model_fedcsga),
+                client_datasets[i],
+                config.epochs,
+                config.lr,
+                config.batch_size,
+                config.device,
             )
             for i in selected
         ]
         global_model_fedcsga = fedavg_aggregate(
-            local_models, [client_datasets[i] for i in selected], config.device,
+            local_models,
+            [client_datasets[i] for i in selected],
+            config.device,
         )
         acc, loss = evaluate(global_model_fedcsga, test_dataset, config.device)
         fedcsga_acc.append(acc)
         fedcsga_loss.append(loss)
-        logging.info(f"FedCSGA: Accuracy {acc:.4f}, Loss {loss:.4f}")
+        fedcsga_time = time.time() - start_time
+        fedcsga_times.append(fedcsga_time)
+        logging.info(
+            f"FedCSGA: Accuracy {acc:.4f}, Loss {loss:.4f}, Time {fedcsga_time:.2f}s"
+        )
         # Checkpoint
         if (round_num + 1) % 10 == 0 or round_num == config.rounds - 1:
-            torch.save(global_model_fedcsga.state_dict(), f"checkpoints/round_{round_num+1}_fedcsga.pth")
+            torch.save(
+                global_model_fedcsga.state_dict(),
+                f"checkpoints/round_{round_num + 1}_fedcsga.pth",
+            )
 
         # GenFed: Random selection + GenFed aggregation
+        start_time = time.time()
         selected = np.random.choice(config.num_clients, config.k, replace=False)
         genfed_selections.append(selected.tolist())
         logging.info(f"GenFed (Random Selection + GenFed): Selected clients {selected}")
         local_models = [
             train_local(
-                copy.deepcopy(global_model_genfed), client_datasets[i], config.epochs, config.lr, config.batch_size, config.device,
+                copy.deepcopy(global_model_genfed),
+                client_datasets[i],
+                config.epochs,
+                config.lr,
+                config.batch_size,
+                config.device,
             )
             for i in selected
         ]
@@ -149,12 +206,19 @@ def main(config: FLConfig = None):
         acc, loss = evaluate(global_model_genfed, test_dataset, config.device)
         genfed_acc.append(acc)
         genfed_loss.append(loss)
-        logging.info(f"GenFed: Accuracy {acc:.4f}, Loss {loss:.4f}")
+        genfed_time = time.time() - start_time
+        genfed_times.append(genfed_time)
+        logging.info(
+            f"GenFed: Accuracy {acc:.4f}, Loss {loss:.4f}, Time {genfed_time:.2f}s"
+        )
         # Checkpoint
         if (round_num + 1) % 10 == 0 or round_num == config.rounds - 1:
-            torch.save(global_model_genfed.state_dict(), f"checkpoints/round_{round_num+1}_genfed.pth")
+            torch.save(
+                global_model_genfed.state_dict(),
+                f"checkpoints/round_{round_num + 1}_genfed.pth",
+            )
 
-        round_time = time.time() - start_time
+        round_time = baseline_time + fedcsga_time + genfed_time
         round_times.append(round_time)
         logging.info(f"Round {round_num + 1} completed in {round_time:.2f} seconds")
 
@@ -179,10 +243,12 @@ def main(config: FLConfig = None):
     ax2.legend()
     ax2.grid(True)
 
-    ax3.plot(range(1, config.rounds + 1), round_times, label="Round Time")
+    ax3.plot(range(1, config.rounds + 1), baseline_times, label="FedAvg Baseline")
+    ax3.plot(range(1, config.rounds + 1), fedcsga_times, label="FedCSGA")
+    ax3.plot(range(1, config.rounds + 1), genfed_times, label="GenFed")
     ax3.set_xlabel("Rounds")
     ax3.set_ylabel("Time (seconds)")
-    ax3.set_title("Time per Round")
+    ax3.set_title("Time per Method per Round")
     ax3.legend()
     ax3.grid(True)
 

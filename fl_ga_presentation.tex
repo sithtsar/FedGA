@@ -1,0 +1,683 @@
+\documentclass{beamer}
+\usetheme{Madrid}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+\newtheorem{proposition}{Proposition}
+\newtheorem{lemma}{Lemma}
+\newtheorem{corollary}{Corollary}
+
+\title{Genetic Algorithms for Federated Learning:\\Two Distinct Approaches}
+\subtitle{GenFed vs. FedCSGA - Comprehensive Analysis}
+\author{Based on Papers by Zheng et al. and Wu et al. (2025)}
+\institute{CS6007 Project}
+\date{\today}
+
+\begin{document}
+
+\begin{frame}
+\titlepage
+\end{frame}
+
+\begin{frame}{Overview}
+\tableofcontents
+\end{frame}
+
+\section{Experimental Setup}
+
+\begin{frame}{Base Training Configuration}
+\textbf{Model Architecture:}
+\begin{itemize}
+\item MLP: 784 (input) $\to$ 128 $\to$ 64 $\to$ 10 (output)
+\item Loss: CrossEntropyLoss
+\item Optimizer: SGD with momentum
+\end{itemize}
+
+\textbf{Training Hyperparameters:}
+\begin{itemize}
+\item Learning rate: $\eta = 0.01$
+\item Local epochs: $E = 5$
+\item Batch size: 32
+\item Device: CUDA/CPU auto-detect
+\end{itemize}
+
+\textbf{Datasets:}
+\begin{itemize}
+\item MNIST (our implementation): 60k train, 10k test
+\item Fashion-MNIST, SVHN, CIFAR-10 (paper results)
+\item Non-IID partitioning: Dirichlet distribution with parameter $\alpha$
+\item Lower $\alpha$ = more heterogeneous data (default: $\alpha = 0.5$)
+\end{itemize}
+\end{frame}
+
+\section{Introduction \& Background}
+
+\begin{frame}{Federated Learning: Core Problem}
+Given $N$ clients with local datasets $\mathcal{D}_i$, solve:
+\begin{equation}
+\min_{w \in \mathbb{R}^d} f(w) = \sum_{i=1}^{N} \frac{n_i}{n} F_i(w)
+\end{equation}
+where $F_i(w) = \frac{1}{n_i}\sum_{(x,y) \in \mathcal{D}_i} \ell(w; x, y)$
+
+\vspace{0.3cm}
+\textbf{Key Challenges:}
+\begin{itemize}
+\item \textbf{System Heterogeneity:} Different compute/communication capabilities
+\item \textbf{Data Heterogeneity:} Non-IID data distributions (non-uniform class distributions)
+\item \textbf{Communication Efficiency:} Limited bandwidth, time constraints
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Two GA Approaches: When to Apply?}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\textbf{FedCSGA} (Wu et al., 2025)\\
+\textcolor{blue}{Before Training}
+\begin{itemize}
+\item Select which clients
+\item Maximize clients within deadline
+\item Order matters (sequential upload)
+\item Full GA with operators
+\end{itemize}
+\end{column}
+
+\begin{column}{0.48\textwidth}
+\textbf{GenFed} (Zheng et al.)\\
+\textcolor{red}{After Training}
+\begin{itemize}
+\item Select which models
+\item Select top-$\rho_t$ by accuracy  
+\item No specific order
+\item Selection only (minimal GA)
+\end{itemize}
+\end{column}
+\end{columns}
+
+\vspace{0.4cm}
+\textbf{Key Insight:} Client selection ≠ Model selection
+\end{frame}
+
+\section{Theoretical Foundations}
+
+\begin{frame}{Mathematical Guarantees}
+\begin{theorem}[GenFed Convergence Rate]
+Under top-$\rho_t$ selection with validation accuracy, GenFed achieves:
+$$\mathbb{E}[f(w_T) - f(w^*)] \leq O\left(\frac{1}{\rho_{\min} T}\right) + O(\epsilon_{\text{val}})$$
+where $\rho_{\min} = \min_t \rho_t$ and $\epsilon_{\text{val}}$ is validation set bias.
+\end{theorem}
+
+\begin{lemma}[Monotonicity of Selection]
+If $a_i > a_j$ (validation accuracy), then $\mathbb{E}[\|\nabla F_i(w)\|] \geq \mathbb{E}[\|\nabla F_j(w)\|]$ under convex loss.
+\end{lemma}
+
+\begin{theorem}[FedCSGA NP-Hardness]
+The deadline-constrained client selection problem:
+$$\max_{\mathbf{q}} |\mathbf{q}| \quad \text{s.t.} \quad \Theta_{|\mathbf{q}|}^{\mathbf{q}} \leq T$$
+is NP-hard via reduction from \textsc{Bin Packing}.
+\end{theorem}
+
+\textbf{Complexity:} GenFed selection is $O(k \log k)$ (heap), FedCSGA GA is $O(nGR)$ (pop × gen × rounds).
+\end{frame}
+
+\section{Paper 1: GenFed}
+
+\begin{frame}{GenFed: Genetic Mechanism Mapping}
+\textbf{FL as Genetic Evolution:}
+\begin{table}
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Genetic Mechanism} & \textbf{FL Component} \\
+\hline
+Crossover & Server aggregation \\
+Mutation & Local training \\
+Selection & \textcolor{red}{Missing in traditional FL!} \\
+\hline
+\end{tabular}
+\end{table}
+
+\vspace{0.3cm}
+\textbf{GenFed Innovation:} Add fitness-based model selection
+
+\textbf{Requirements:}
+\begin{itemize}
+\item Global validation set $\mathcal{D}_g^{\text{val}}$ (public, balanced data)
+\item Evaluate models: $a_i = \text{Acc}(w_i^t, \mathcal{D}_g^{\text{val}})$
+\item Select top-$\rho_t$ models by validation accuracy
+\item Aggregate: $w_{t+1} = \sum_{i \in \mathcal{C}_t} \frac{n_i}{n_{\mathcal{C}_t}} w_i^t$ where $|\mathcal{C}_t| = \rho_t$
+\end{itemize}
+\end{frame}
+
+\begin{frame}{GenFed: Algorithm}
+\scriptsize
+\begin{algorithmic}[1]
+\STATE \textbf{Input:} $N$ clients, $T$ rounds, $k$ selected/round, $\rho_{\max}$, strategy
+\STATE Initialize $w_0$, prepare $\mathcal{D}_g^{\text{val}}$
+\STATE \textbf{// Initialization: Data Supplement (optional)}
+\FOR{client $i$ with insufficient data}
+    \STATE Server sends random subset of $\mathcal{D}_g^{\text{val}}$ to client $i$
+\ENDFOR
+\STATE \textbf{// Training Phase}
+\FOR{$t = 1$ to $T$}
+    \STATE $\mathcal{S}_t \leftarrow$ RandomSelect($k$ clients)
+    \FOR{client $i \in \mathcal{S}_t$ in parallel}
+        \STATE $w_i^{t+1} \leftarrow$ LocalUpdate$(w_t, \mathcal{D}_i, E, \eta)$
+    \ENDFOR
+    \STATE Evaluate: $a_i \leftarrow \text{Acc}(w_i^{t+1}, \mathcal{D}_g^{\text{val}})$ for all $i \in \mathcal{S}_t$
+    \STATE $\rho_t \leftarrow$ GetRho$(t, T, \rho_{\max}, \text{strategy})$
+    \STATE $\mathcal{C}_t \leftarrow$ top-$\rho_t$ clients from $\mathcal{S}_t$ by $\{a_i\}$ (binary heap: $O(k\log k)$)
+    \STATE $w_{t+1} \leftarrow \sum_{i \in \mathcal{C}_t} \frac{n_i}{n_{\mathcal{C}_t}} w_i^{t+1}$
+\ENDFOR
+\end{algorithmic}
+\end{frame}
+
+\begin{frame}{GenFed: $\rho_t$ Scheduling Strategies}
+\textbf{1. Constant:} $\rho_t = \rho_{\max}$
+
+\textbf{2. Exponential/Power:} $\rho_t = \rho_{\max} \times (1 - b^t) + 1$, $b \in (0,1)$
+
+\textbf{3. Linear:} $\rho_t = \min(\rho_{\max} \times t/c + 1, \rho_{\max})$
+
+\textbf{4. Sinusoidal ($\pi/2$):} $\rho_t = \min(\rho_{\max} \times \sin(t\pi/(2c)) + 1, \rho_{\max})$
+
+\textbf{5. Sinusoidal ($\pi$):} Full period sine function
+
+\vspace{0.3cm}
+\textbf{Intuition:}
+\begin{itemize}
+\item Early: Few models $\to$ faster exploration  
+\item Late: More models $\to$ stability
+\item Best performers: strategies (2), (3), (4)
+\end{itemize}
+\end{frame}
+
+\begin{frame}{GenFed: Experimental Results \& Robustness}
+\scriptsize
+\textbf{Setup:} 100 clients, 10/round, Dirichlet $\alpha=0.1$, $\rho_{\max}=5$
+
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\textbf{Performance Results:}
+\begin{table}
+\centering
+\tiny
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Dataset} & \textbf{Speedup} & \textbf{Acc Gain} \\
+\hline
+MNIST & 15× & +1.17\% \\
+SVHN & 34× & +1.62\% \\
+Fashion & 36× & +7.71\% \\
+CIFAR-10 & 16× & +3.98\% \\
+\hline
+\end{tabular}
+\end{table}
+\tiny Time savings: 93-98\% reduction
+\end{column}
+
+\begin{column}{0.48\textwidth}
+\textbf{Byzantine Robustness (CIFAR-10):}
+\begin{table}
+\centering
+\tiny
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Attack} & \textbf{FedAvg} & \textbf{GenFed} \\
+\hline
+No Attack & 49.94\% & 53.92\% \\
+Label Flip & -5.90\% & \textbf{-3.01\%} \\
+IPM & -2.93\% & \textbf{-0.77\%} \\
+Mimic & -3.96\% & \textbf{-1.38\%} \\
+\hline
+\end{tabular}
+\end{table}
+\tiny Validation filtering reduces attack degradation by $>50\%$
+\end{column}
+\end{columns}
+
+\vspace{0.2cm}
+\textbf{Key Insights:}
+\begin{itemize}
+\item 10-36× faster convergence across all datasets
+\item Higher final accuracy (+1-8\%)
+\item Inherent robustness via model quality filtering
+\end{itemize}
+\end{frame}
+
+\section{Paper 2: FedCSGA}
+
+\begin{frame}{FedCSGA: System Model \& Optimization Problem}
+\textbf{Time Components:}
+\begin{itemize}
+\item Computation: $t_i' = \frac{e \cdot d_i}{c_i}$ (epochs × data / capacity)
+\item Communication: $t_i = \frac{S}{B_i}$ (model size / bandwidth)
+\item \textbf{Sequential upload:} Clients upload one-by-one
+\end{itemize}
+
+\textbf{Total Time for Sequence} $\mathbf{q} = \langle q_1, \ldots, q_{|\mathbf{q}|} \rangle$:
+\begin{equation}
+\Theta_j^{\mathbf{q}} = T_j^{\mathbf{q}} + \widehat{T}_j^{\mathbf{q}}
+\end{equation}
+where $T_j$ = total communication, $\widehat{T}_j$ = non-overlapped computation
+
+\textbf{Optimization:} $\max_{\mathbf{q}} |\mathbf{q}|$ s.t. $\Theta_{|\mathbf{q}|} \leq T$ (NP-hard)
+
+\vspace{0.2cm}
+\textbf{Why Order Matters:} Different sequences of same clients finish at different times!
+\begin{itemize}
+\item Computation can overlap with previous clients' communication
+\item Optimal ordering: Start with slow computation clients (max overlap)
+\item GA explores sequence space more effectively than greedy heuristics
+\end{itemize}
+\end{frame}
+
+\begin{frame}{FedCSGA: Fitness Function}
+\textbf{Fitness with Adaptive Penalty:}
+\begin{equation}
+F(\mathbf{q}_i) = h(\mathbf{q}_i) - \lambda g(\mathbf{q}_i)
+\end{equation}
+
+\textbf{Objective (IID):} $h(\mathbf{q}_i) = |\mathbf{q}_i|$
+
+\textbf{Penalty:} $g(\mathbf{q}_i) = e^{\max(0, (\Theta - T)/T)} - 1$
+
+\textbf{Adaptive $\lambda$:} $\lambda = \lambda_0 e^{\sqrt{r}}$ where $r$ = generation, $\lambda_0=0.8$
+
+\textbf{Intuition:}
+\begin{itemize}
+\item Early: Small $\lambda$ → exploration (some infeasible OK)
+\item Late: Large $\lambda$ → enforce feasibility
+\end{itemize}
+
+\textbf{Non-IID Extension:}
+\begin{equation}
+h(\mathbf{q}_i) = \sum_{j=1}^{|\mathbf{q}_i|} (1 - \alpha \cdot A(q_{ij}))
+\end{equation}
+where $A(q_{ij})$ = client accuracy, $\alpha \in [0,1]$ = weight
+\end{frame}
+
+\begin{frame}{FedCSGA: GA Operators}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\textbf{Adaptive Rates:}
+\begin{equation*}
+p_c = \begin{cases}
+\frac{0.5(F_{\max} - F_{\text{larger}})}{F_{\max} - F_{\text{avg}}}, & F \geq F_{\text{avg}} \\
+0.9, & \text{otherwise}
+\end{cases}
+\end{equation*}
+\begin{equation*}
+p_m = \begin{cases}
+\frac{0.02(F_{\max} - F)}{F_{\max} - F_{\text{avg}}}, & F \geq F_{\text{avg}} \\
+0.05, & \text{otherwise}
+\end{cases}
+\end{equation*}
+\tiny High-fitness → preserve, Low-fitness → explore
+\end{column}
+
+\begin{column}{0.48\textwidth}
+\textbf{Specialized Operators:}
+\begin{itemize}
+\item \textbf{Uniform Crossover:} Exchange genes with prob. $p_c$, skip duplicates
+\item \textbf{Adjacent Swap Mutation:} Swap with next gene (gentler than random swap)
+\item Last gene: Append new client greedily
+\item \textbf{Selection:} Binary tournament (size 2)
+\end{itemize}
+\end{column}
+\end{columns}
+
+\vspace{0.3cm}
+\textbf{Configuration:} Population $n=90$, Generations $R=10$ per round
+
+\textbf{Key Innovation:} Adaptive rates balance exploration/exploitation dynamically
+\end{frame}
+
+\begin{frame}{FedCSGA: Experimental Results}
+\scriptsize
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\textbf{IID Setting} ($T=3$min):
+\begin{table}
+\centering
+\tiny
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Method} & \textbf{Clients/R} & \textbf{Acc} \\
+\hline
+\multicolumn{3}{|c|}{\textbf{Fashion-MNIST}} \\
+\hline
+FedAvg & 5.2 & 85.1\% \\
+FedCSGA & \textbf{12.7} & \textbf{89.5\%} \\
+\textbf{Gain} & \textbf{+145\%} & \textbf{+5.2\%} \\
+\hline
+\multicolumn{3}{|c|}{\textbf{CIFAR-10}} \\
+\hline
+FedAvg & 4.8 & 68.3\% \\
+FedCSGA & \textbf{11.9} & \textbf{74.5\%} \\
+\textbf{Gain} & \textbf{+148\%} & \textbf{+9.1\%} \\
+\hline
+\end{tabular}
+\end{table}
+\end{column}
+
+\begin{column}{0.48\textwidth}
+\textbf{Non-IID Setting} ($T=5$min, $\alpha=0.7$):
+\begin{table}
+\centering
+\tiny
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Method} & \textbf{Clients/R} & \textbf{Acc} \\
+\hline
+\multicolumn{3}{|c|}{\textbf{Fashion-MNIST}} \\
+\hline
+FedAvg & 8.5 & 81.3\% \\
+Oort & 12.3 & 85.9\% \\
+FedCSGA & \textbf{13.4} & \textbf{93.6\%} \\
+\textbf{Gain} & \textbf{+58\%} & \textbf{+15\%} \\
+\hline
+\multicolumn{3}{|c|}{\textbf{CIFAR-10}} \\
+\hline
+FedAvg & 7.9 & 63.5\% \\
+Oort & 11.5 & 69.1\% \\
+FedCSGA & \textbf{12.7} & \textbf{76.2\%} \\
+\textbf{Gain} & \textbf{+61\%} & \textbf{+20\%} \\
+\hline
+\end{tabular}
+\end{table}
+\end{column}
+\end{columns}
+
+\vspace{0.2cm}
+\textbf{Key Insights:}
+\begin{itemize}
+\item GA outperforms greedy: +45-60\% more clients/round vs FedAvg
+\item Non-IID fitness ($\alpha=0.7$): Balance diversity + quality
+\item Adaptive operators crucial for avoiding local optima
+\end{itemize}
+\end{frame}
+
+\section{Comparison \& Our Implementation}
+
+\begin{frame}{GenFed vs. FedCSGA: Key Differences}
+\begin{table}
+\centering
+\tiny
+\begin{tabular}{|l|p{4cm}|p{4cm}|}
+\hline
+\textbf{Aspect} & \textbf{GenFed} & \textbf{FedCSGA} \\
+\hline
+\textbf{Stage} & After training & Before training \\
+\textbf{Decision} & Which models to aggregate & Which clients to select \\
+\textbf{Objective} & Max accuracy (top-$\rho_t$) & Max clients under deadline \\
+\textbf{GA Use} & Minimal (selection only) & Full (crossover, mutation, selection) \\
+\textbf{Chromosome} & N/A (ranking) & Sequence $\langle q_1, \ldots \rangle$ \\
+\textbf{Fitness} & Validation accuracy & $|\mathbf{q}| - \lambda e^{(\Theta-T)/T}$ \\
+\textbf{Key Tool} & Global validation set & Time model + adaptive operators \\
+\textbf{Non-IID} & Filter low-quality models & Prioritize low-accuracy clients \\
+\textbf{Speedup} & 10-35× fewer rounds & 45-54\% more clients/round \\
+\textbf{Scale} & 100+ clients (papers) & 100 clients (papers) \\
+\hline
+\end{tabular}
+\end{table}
+\end{frame}
+
+\begin{frame}{Our Implementation Results}
+\textbf{Setup:} $N=10$ clients, $k=5$, MNIST, $\alpha=0.5$, Rounds 11-30
+
+\begin{table}
+\centering
+\small
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Method} & \textbf{Avg Accuracy} & \textbf{Avg Time/Round} \\
+\hline
+FedAvg (Baseline) & 96.61\% & 38.35s \\
+GenFed ($\rho_{\max}=5$) & \textbf{97.02\%} (+0.41\%) & 51.15s (+33\%) \\
+FedCSGA & 96.18\% (-0.43\%) & 36.60s (-4.5\%) \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Analysis:}
+\begin{itemize}
+\item \textbf{GenFed:} Success! +0.41\% accuracy (validates paper results)
+\item \textbf{FedCSGA:} Underperformed (-0.43\%) despite GA
+\end{itemize}
+
+\textbf{Why FedCSGA failed:}
+\begin{enumerate}
+\item \textbf{Stale fitness:} Precomputed accuracies on $w_0$ outdated
+\item \textbf{Small scale:} $N=10$ → GA overhead not justified (papers used 100)
+\item \textbf{Proxy issue:} Local accuracy $\neq$ true contribution
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{Lessons Learned: FedCSGA Failure}
+\textbf{Root Cause: Fitness Staleness}
+
+\textbf{Problem:}
+\begin{itemize}
+\item Computed $\{a_i^{(0)}\}$ once on $w_0$
+\item As $w_t$ evolves, $a_i^{(0)}$ becomes irrelevant
+\item Correlation: $\rho(t) = \text{Corr}(\phi_t^{\text{true}}, \phi^{\text{proxy}}) \to 0$
+\end{itemize}
+
+\textbf{Proposed Fixes:}
+\begin{enumerate}
+\item Recompute accuracies every $M$ rounds (e.g., $M=5$)
+\item Use dynamic fitness: Learn $\hat{\phi}_t(w_t, \mathcal{S})$ via meta-learning
+\item Scale to $N=100$ clients (GA advantage becomes clear)
+\end{enumerate}
+
+\textbf{Scale Effect:}
+\begin{itemize}
+\item Papers: $N=100$ → GA beats greedy significantly
+\item Ours: $N=10$ → Greedy competitive, GA overhead dominates
+\end{itemize}
+\end{frame}
+
+\begin{frame}{When to Use Which?}
+\textbf{Use GenFed when:}
+\begin{itemize}
+\item[$\checkmark$] Have access to public validation data
+\item[$\checkmark$] Malicious/unreliable clients are concern
+\item[$\checkmark$] Goal: Maximize convergence speed
+\item[$\checkmark$] Server can evaluate models efficiently
+\item[$\times$] No strict time deadlines per round
+\end{itemize}
+
+\textbf{Use FedCSGA when:}
+\begin{itemize}
+\item[$\checkmark$] Strict time deadlines (real-time apps)
+\item[$\checkmark$] System heterogeneity is significant
+\item[$\checkmark$] Client profiles available (bandwidth, compute)
+\item[$\checkmark$] Goal: Maximize participation per round
+\item[$\times$] No public validation data available
+\end{itemize}
+
+\textbf{Hybrid:} FedCSGA (client selection) + GenFed (model filtering) = Best of both?
+\end{frame}
+
+\section{Conclusion}
+
+\begin{frame}{Summary \& Future Work}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\textbf{Key Contributions:}
+\begin{itemize}
+\item \textbf{GenFed:} Post-training model selection
+  \begin{itemize}
+  \scriptsize
+  \item 10-35× speedup, +4-8\% accuracy
+  \item Robust to attacks
+  \item \textcolor{blue}{Validated in our impl.!}
+  \end{itemize}
+\item \textbf{FedCSGA:} Pre-training client selection
+  \begin{itemize}
+  \scriptsize
+  \item +45-54\% more clients/round
+  \item Handles time constraints
+  \item Needs scale \& fresh fitness
+  \end{itemize}
+\end{itemize}
+
+\textbf{Our Insight:}
+\begin{itemize}
+\scriptsize
+\item Fitness quality = critical
+\item Real-time eval > Stale proxy
+\item Different problems, different solutions
+\end{itemize}
+\end{column}
+
+\begin{column}{0.48\textwidth}
+\textbf{Future Directions:}
+\begin{itemize}
+\item \textbf{Immediate:}
+  \begin{itemize}
+  \scriptsize
+  \item Fix FedCSGA fitness staleness
+  \item Scale to $N=100$ clients
+  \item Test hybrid approach
+  \end{itemize}
+\item \textbf{Research:}
+  \begin{itemize}
+  \scriptsize
+  \item Meta-learning fitness estimation
+  \item Convergence proofs for top-$\rho_t$
+  \item Multi-objective GA (acc + fairness)
+  \end{itemize}
+\item \textbf{Practical:}
+  \begin{itemize}
+  \scriptsize
+  \item Larger datasets (CIFAR-100)
+  \item Extreme non-IID ($\alpha < 0.1$)
+  \item Differential privacy integration
+  \end{itemize}
+\end{itemize}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{References}
+\small
+\begin{enumerate}
+\item \textbf{Zheng et al.} "Accelerating Federated Learning with Genetic Algorithm Enhancements."
+\item \textbf{Wu, Ji, Yi, Liu (2025).} "Optimizing Client Selection in Federated Learning Based on Genetic Algorithm."
+\item \textbf{McMahan et al. (2017).} "Communication-Efficient Learning of Deep Networks from Decentralized Data." AISTATS.
+\item \textbf{Li et al. (2020).} "Federated Optimization in Heterogeneous Networks." MLSys.
+\item \textbf{Holland (1975).} "Adaptation in Natural and Artificial Systems."
+\item \textbf{Hsu et al. (2019).} "Measuring the Effects of Non-IID Data on FL." arXiv:1909.06335.
+\end{enumerate}
+\end{frame}
+
+\appendix
+
+\section*{Backup Slides}
+
+\begin{frame}{Backup: GenFed Scalability Analysis}
+\textbf{Performance vs. Client Count (CIFAR-10):}
+\begin{table}
+\centering
+\footnotesize
+\begin{tabular}{|l|c|c|c|c|c|}
+\hline
+\textbf{Clients} & \textbf{20} & \textbf{60} & \textbf{100} & \textbf{140} & \textbf{180} \\
+\hline
+FedAvg & 58.26\% & 56.06\% & 49.94\% & 48.20\% & 44.93\% \\
+GenFed(3) & 57.53\% & 54.78\% & 53.92\% & \textbf{56.19\%} & \textbf{58.08\%} \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Key Insights:}
+\begin{itemize}
+\item FedAvg: -13\% degradation (20→180 clients)
+\item GenFed: Stable, even improves beyond 140 clients!
+\item Validation-based filtering scales well with more clients
+\item Larger client pools provide more high-quality models to select from
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Backup: FedCSGA $\alpha$ Parameter Impact}
+\textbf{Non-IID Fitness Function:} $h(\mathbf{q}) = \sum_{j=1}^{|\mathbf{q}|} (1 - \alpha \cdot A(q_j))$
+
+\begin{table}
+\centering
+\footnotesize
+\begin{tabular}{|l|c|c|c|c|c|}
+\hline
+$\alpha$ & 0.0 & 0.3 & 0.5 & 0.7 & 1.0 \\
+\hline
+Fashion-MNIST & 85.2\% & 88.7\% & 91.3\% & \textbf{93.6\%} & 89.1\% \\
+CIFAR-10 & 67.8\% & 71.4\% & 74.1\% & \textbf{76.2\%} & 72.5\% \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Analysis:}
+\begin{itemize}
+\item $\alpha=0$: Maximize clients only (ignores accuracy) → suboptimal convergence
+\item $\alpha=1$: Maximize accuracy-weighted sum → too few clients selected
+\item $\alpha=0.7$: \textbf{Optimal trade-off} between diversity and quality
+\end{itemize}
+
+\textbf{Insight:} Balance diversity (more clients) + quality (prioritize low-accuracy clients who need more training)
+\end{frame}
+
+\begin{frame}{Backup: Detailed FedCSGA System Model Example}
+\textbf{Example:} 3 clients, deadline $T=60$s
+
+\begin{columns}
+\begin{column}{0.45\textwidth}
+Client 1: $t_1'=50$s, $t_1=10$s\\
+Client 3: $t_3'=20$s, $t_3=5$s\\
+Client 7: $t_7'=30$s, $t_7=8$s
+
+\vspace{0.3cm}
+\textbf{Sequence} $\langle 3,7,1 \rangle$:
+\begin{align*}
+\Theta_1 &= 5+20 = 25 \\
+\Theta_2 &= 13+5 = 18 \\
+\Theta_3 &= 23+32 = 55 \checkmark
+\end{align*}
+\end{column}
+
+\begin{column}{0.45\textwidth}
+\vspace{1.5cm}
+
+\textbf{Sequence} $\langle 1,3,7 \rangle$:
+\begin{align*}
+\Theta_1 &= 10+50 = 60 \\
+\Theta_2 &= 15+0 = 15 \\
+\Theta_3 &= 23+15 = 38 \checkmark
+\end{align*}
+\end{column}
+\end{columns}
+
+\vspace{0.3cm}
+Both sequences fit within deadline, but $\langle 1,3,7 \rangle$ finishes 17s faster!
+
+\textbf{Insight:} Sequential upload creates dependencies → order critically affects total time
+\end{frame}
+
+\begin{frame}
+\begin{center}
+\Large \textbf{Thank You!}
+
+\vspace{1cm}
+
+\normalsize
+Questions?
+
+\vspace{1cm}
+
+\small
+Presentation based on comprehensive analysis of:\\
+GenFed (Zheng et al.) \& FedCSGA (Wu et al., 2025)
+\end{center}
+\end{frame}
+
+\end{document}
