@@ -62,6 +62,7 @@ def mutation(chromosome, p_m, num_clients):
 
 def ga_client_selection(
     num_clients, k=5, pop_size=90, generations=10, local_accs=None, adaptive=True,
+    tournament_size=3,
 ):
     """
     GA for client selection using FedCSGA-inspired method.
@@ -95,7 +96,7 @@ def ga_client_selection(
                 best_chrom = chrom
 
         # Selection
-        selected = tournament_selection(population, fitnesses)
+        selected = tournament_selection(population, fitnesses, tournament_size)
 
         # Crossover
         new_population = []
