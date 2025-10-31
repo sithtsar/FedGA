@@ -109,7 +109,12 @@ fl-ga-implementation/
 │   ├── __init__.py
 │   └── test_fl.py            # Unit tests
 ├── docs/
-│   └── report.md             # Detailed mathematical report
+│   ├── report.md             # Detailed mathematical report
+│   ├── 1.pdf                 # FedCSGA paper PDF
+│   ├── 1.md                  # FedCSGA paper summary
+│   ├── 2.pdf                 # GenFed paper PDF
+│   ├── 2.md                  # GenFed paper summary
+│   └── proj_idea.md          # Project idea and abstract
 ├── .github/
 │   └── workflows/
 │       └── ci.yml            # GitHub Actions CI
