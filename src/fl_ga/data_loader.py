@@ -1,7 +1,6 @@
-import torch
-from torchvision import datasets, transforms
 import numpy as np
-from torch.utils.data import Dataset, DataLoader, Subset
+from torch.utils.data import Subset
+from torchvision import datasets, transforms
 
 
 def dirichlet_partition(dataset, num_clients, alpha=0.5):
@@ -37,14 +36,14 @@ def load_mnist(num_clients=10, alpha=0.5):
     Load MNIST and partition into non-IID client datasets.
     """
     transform = transforms.Compose(
-        [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
+        [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))],
     )
 
     train_dataset = datasets.MNIST(
-        root="./data", train=True, download=True, transform=transform
+        root="./data", train=True, download=True, transform=transform,
     )
     test_dataset = datasets.MNIST(
-        root="./data", train=False, download=True, transform=transform
+        root="./data", train=False, download=True, transform=transform,
     )
 
     client_indices = dirichlet_partition(train_dataset, num_clients, alpha)

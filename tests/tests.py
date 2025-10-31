@@ -1,11 +1,10 @@
-import unittest
-import torch
-from data_loader import load_mnist
-from model import create_model
-from fl_base import evaluate, train_local, fedavg_aggregate
-from ga_selection import ga_client_selection
-import numpy as np
 import copy
+import unittest
+
+from data_loader import load_mnist
+from fl_base import evaluate, fedavg_aggregate, train_local
+from ga_selection import ga_client_selection
+from model import create_model
 
 
 class TestFL(unittest.TestCase):
@@ -39,14 +38,14 @@ class TestFL(unittest.TestCase):
             for i in range(3)
         ]
         aggregated = fedavg_aggregate(
-            local_models, [self.client_datasets[i] for i in range(3)]
+            local_models, [self.client_datasets[i] for i in range(3)],
         )
         self.assertIsNotNone(aggregated)
 
     def test_ga_selection(self):
         local_accs = [0.5 + 0.1 * i for i in range(self.num_clients)]  # mock
         selected = ga_client_selection(
-            self.num_clients, k=3, pop_size=10, generations=2, local_accs=local_accs
+            self.num_clients, k=3, pop_size=10, generations=2, local_accs=local_accs,
         )
         self.assertEqual(len(selected), 3)
         self.assertEqual(len(set(selected)), 3)  # unique

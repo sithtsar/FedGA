@@ -1,5 +1,6 @@
-import numpy as np
 import copy
+
+import numpy as np
 
 
 def tournament_selection(population, fitnesses, tournament_size=3):
@@ -21,7 +22,7 @@ def repair_chromosome(chrom, num_clients):
     seen = set()
     for i in range(len(chrom)):
         if chrom[i] in seen:
-            available = set(range(num_clients)) - seen - set(chrom[i+1:])
+            available = set(range(num_clients)) - seen - set(chrom[i + 1 :])
             if available:
                 chrom[i] = np.random.choice(list(available))
             else:
@@ -29,6 +30,7 @@ def repair_chromosome(chrom, num_clients):
                 chrom[i] = (chrom[i] + 1) % num_clients
         seen.add(chrom[i])
     return chrom
+
 
 def crossover(parent1, parent2, p_c, num_clients):
     """
@@ -59,7 +61,7 @@ def mutation(chromosome, p_m, num_clients):
 
 
 def ga_client_selection(
-    num_clients, k=5, pop_size=90, generations=10, local_accs=None, adaptive=True
+    num_clients, k=5, pop_size=90, generations=10, local_accs=None, adaptive=True,
 ):
     """
     GA for client selection using FedCSGA-inspired method.

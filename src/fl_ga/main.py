@@ -1,16 +1,16 @@
-import torch
-import numpy as np
-import matplotlib.pyplot as plt
 import copy
 import logging
 import time
+
+import matplotlib.pyplot as plt
+import numpy as np
 from data_loader import load_mnist
-from model import create_model
-from fl_base import train_local, fedavg_aggregate, evaluate, genfed_aggregate, get_rho_t
+from fl_base import evaluate, fedavg_aggregate, genfed_aggregate, get_rho_t, train_local
 from ga_selection import ga_client_selection
+from model import create_model
 
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
 
@@ -24,14 +24,14 @@ def main():
     device = "cpu"  # or 'cuda' if available
 
     logging.info(
-        f"Parameters: num_clients={num_clients}, k={k}, rounds={rounds}, alpha={alpha}, device={device}"
+        f"Parameters: num_clients={num_clients}, k={k}, rounds={rounds}, alpha={alpha}, device={device}",
     )
 
     # Load data
     logging.info("Loading MNIST data...")
     client_datasets, test_dataset = load_mnist(num_clients, alpha)
     logging.info(
-        f"Data loaded: {len(client_datasets)} client datasets, {len(test_dataset)} test samples"
+        f"Data loaded: {len(client_datasets)} client datasets, {len(test_dataset)} test samples",
     )
 
     # Initialize global models for each method
@@ -66,12 +66,12 @@ def main():
         logging.info(f"Baseline: Selected clients {selected}")
         local_models = [
             train_local(
-                copy.deepcopy(global_model_base), client_datasets[i], device=device
+                copy.deepcopy(global_model_base), client_datasets[i], device=device,
             )
             for i in selected
         ]
         global_model_base = fedavg_aggregate(
-            local_models, [client_datasets[i] for i in selected], device
+            local_models, [client_datasets[i] for i in selected], device,
         )
         acc, loss = evaluate(global_model_base, test_dataset, device)
         baseline_acc.append(acc)
@@ -83,12 +83,12 @@ def main():
         logging.info(f"Paper 1: GA selected clients {selected}")
         local_models = [
             train_local(
-                copy.deepcopy(global_model_p1), client_datasets[i], device=device
+                copy.deepcopy(global_model_p1), client_datasets[i], device=device,
             )
             for i in selected
         ]
         global_model_p1 = fedavg_aggregate(
-            local_models, [client_datasets[i] for i in selected], device
+            local_models, [client_datasets[i] for i in selected], device,
         )
         acc, loss = evaluate(global_model_p1, test_dataset, device)
         paper1_acc.append(acc)
@@ -100,7 +100,7 @@ def main():
         logging.info(f"Paper 2: Selected clients {selected}")
         local_models = [
             train_local(
-                copy.deepcopy(global_model_p2), client_datasets[i], device=device
+                copy.deepcopy(global_model_p2), client_datasets[i], device=device,
             )
             for i in selected
         ]
@@ -149,13 +149,13 @@ def main():
     # Print final results
     logging.info("Simulation completed")
     logging.info(
-        f"Final Baseline Accuracy: {baseline_acc[-1]:.4f}, Loss: {baseline_loss[-1]:.4f}"
+        f"Final Baseline Accuracy: {baseline_acc[-1]:.4f}, Loss: {baseline_loss[-1]:.4f}",
     )
     logging.info(
-        f"Final Paper 1 Accuracy: {paper1_acc[-1]:.4f}, Loss: {paper1_loss[-1]:.4f}"
+        f"Final Paper 1 Accuracy: {paper1_acc[-1]:.4f}, Loss: {paper1_loss[-1]:.4f}",
     )
     logging.info(
-        f"Final Paper 2 Accuracy: {paper2_acc[-1]:.4f}, Loss: {paper2_loss[-1]:.4f}"
+        f"Final Paper 2 Accuracy: {paper2_acc[-1]:.4f}, Loss: {paper2_loss[-1]:.4f}",
     )
 
 

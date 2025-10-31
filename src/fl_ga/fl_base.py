@@ -1,7 +1,8 @@
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
 import copy
+
+import torch
+from torch import nn
+from torch.utils.data import DataLoader
 
 
 def train_local(model, dataset, epochs=5, lr=0.01, batch_size=32, device="cpu"):
@@ -71,8 +72,8 @@ def evaluate(model, dataset, device="cpu"):
 
 
 if __name__ == "__main__":
-    from model import create_model
     from data_loader import load_mnist
+    from model import create_model
 
     # Test
     client_datasets, test_dataset = load_mnist(num_clients=10, alpha=0.5)
@@ -114,10 +115,9 @@ def get_rho_t(round_num, max_rounds=100, strategy="constant", rho_max=5):
     """
     if strategy == "constant":
         return rho_max
-    elif strategy == "linear":
+    if strategy == "linear":
         return min(rho_max, int(rho_max * (round_num / max_rounds) + 1))
-    elif strategy == "power":
+    if strategy == "power":
         b = 0.9  # example
         return min(rho_max, int(rho_max * (1 - b**round_num) + 1))
-    else:
-        return rho_max
+    return rho_max
