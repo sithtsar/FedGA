@@ -1,5 +1,8 @@
 # Federated Learning with Genetic Algorithm Client Selection
 
+[![CI](https://github.com/sithtsar/FedGA/actions/workflows/ci.yml/badge.svg)](https://github.com/sithtsar/FedGA/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 This project implements and compares two genetic algorithm-based methods for client selection in Federated Learning (FL), based on the papers:
 
 1. **FedCSGA**: Optimizing Client Selection in Federated Learning Based on Genetic Algorithm with Adaptive Operators (Wu et al., 2025)
@@ -22,7 +25,11 @@ The implementation simulates FL with 10 clients on MNIST dataset, partitioned no
 - uv (for dependency management)
 
 ### Setup
-1. Clone or navigate to the project directory.
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/sithtsar/FedGA.git
+   cd FedGA
+   ```
 2. Install uv if not already installed:
    ```bash
    curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -34,66 +41,86 @@ The implementation simulates FL with 10 clients on MNIST dataset, partitioned no
    source .venv/bin/activate
    uv sync
    ```
-4. Install ruff for linting (optional):
+4. Install pre-commit hooks (optional):
    ```bash
-   uv tool install ruff
+   uv tool install pre-commit
+   pre-commit install
    ```
 
-## Running the Code
+## Usage
 
 ### Run Unit Tests
 To verify the implementation:
 ```bash
 source .venv/bin/activate
-python tests.py
+python -m pytest tests/
 ```
 Or with uv:
 ```bash
-uv run python tests.py
+uv run python -m pytest tests/
 ```
 
 ### Run Linting and Formatting
 Check for errors and format code:
 ```bash
 source .venv/bin/activate
-ruff check .
-ruff format .
+ruff check src/ tests/
+ruff format src/ tests/
 ```
 Or with uv:
 ```bash
-uv run ruff check .
-uv run ruff format .
+uv run ruff check src/ tests/
+uv run ruff format src/ tests/
 ```
 
 ### Run the Main Simulation
 Execute the FL experiment (runs for 50 rounds by default):
 ```bash
 source .venv/bin/activate
-python main.py
+python -m src.fl_ga.main
 ```
 Or with uv:
 ```bash
-uv run python main.py
+uv run python -m src.fl_ga.main
 ```
 
 The simulation will log progress, including selected clients, accuracies, and losses per round. Results are saved as `results.png` with accuracy and loss plots.
 
 ### Customize Parameters
-Edit `main.py` to change:
+Edit `src/fl_ga/main.py` to change:
 - `num_clients`: Number of clients (default 10)
 - `k`: Clients selected per round (default 5)
 - `rounds`: Number of communication rounds (default 50)
 - `alpha`: Dirichlet distribution parameter for non-IID (default 0.5)
 
-## Key Components
+## Project Structure
 
-- `data_loader.py`: MNIST loading and non-IID partitioning
-- `model.py`: MLP model definition
-- `fl_base.py`: Local training, FedAvg, GenFed aggregation, evaluation
-- `ga_selection.py`: GA for client selection
-- `main.py`: Main simulation script with logging
-- `tests.py`: Unit tests
-- `pyproject.toml`: Project configuration for uv
+```
+fl-ga-implementation/
+├── src/
+│   └── fl_ga/
+│       ├── __init__.py
+│       ├── data_loader.py    # MNIST loading and non-IID partitioning
+│       ├── model.py          # MLP model definition
+│       ├── fl_base.py        # Local training, FedAvg, GenFed aggregation, evaluation
+│       ├── ga_selection.py   # GA for client selection
+│       └── main.py           # Main simulation script with logging
+├── tests/
+│   ├── __init__.py
+│   └── test_fl.py            # Unit tests
+├── docs/
+│   └── report.md             # Detailed mathematical report
+├── .github/
+│   └── workflows/
+│       └── ci.yml            # GitHub Actions CI
+├── .pre-commit-config.yaml
+├── pyproject.toml
+├── requirements.txt
+├── README.md
+├── CONTRIBUTING.md
+├── LICENSE
+└── .gitignore
+```
 
 ## Results and Analysis
 
