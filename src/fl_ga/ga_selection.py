@@ -36,6 +36,10 @@ def crossover(parent1, parent2, p_c, num_clients):
     """
     Single-point crossover with repair.
     """
+    # Skip crossover if chromosome length is 1 (k=1 case)
+    if len(parent1) <= 1:
+        return parent1, parent2
+
     if np.random.rand() < p_c:
         point = np.random.randint(1, len(parent1))
         child1 = parent1[:point] + parent2[point:]
