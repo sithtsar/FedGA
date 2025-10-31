@@ -4,6 +4,10 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
+# Optimization: Enable cuDNN benchmark for faster training on GPU
+if torch.cuda.is_available():
+    torch.backends.cudnn.benchmark = True
+
 
 def train_local(model, dataset, epochs=5, lr=0.01, batch_size=32, device="cpu"):
     """
@@ -13,7 +17,7 @@ def train_local(model, dataset, epochs=5, lr=0.01, batch_size=32, device="cpu"):
     model.train()
     optimizer = torch.optim.SGD(model.parameters(), lr=lr)
     criterion = nn.CrossEntropyLoss()
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, pin_memory=(device == "cuda"))
 
     for epoch in range(epochs):
         for data, target in dataloader:
