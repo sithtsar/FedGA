@@ -142,3 +142,23 @@ Expected outcomes: GA-optimized selection improves accuracy by 5-10% and reduces
 - Local epochs: 5
 - LR: 0.01
 - Batch size: 32
+
+## In-Class PPT 
+
+Find Resources like beamer presentation template, pdf and the source paper all in `LargeMarkets` dir 
+
+- Instructor : Prof. Avishek Ghosh 
+- Semester Taken : VII 
+- My Branch : Chemical Engineering 
+- Course Code : CS6007 
+- Year-Sem : 2025-1 (Autumn)
+- Ran-before? : No...Running for the first time 
+- Course Structure : Grading:  Quiz - 15%, Homeworks - 15%, Student Presentation - 15%, Final Project - 30%, Endsem - 25%
+- Quiz Level : Easy-Moderate 
+- Homerworks : Easy 
+- Student PPT : Moderate 
+- Final Project : Depends[For me Easy-Simple Implementation]
+- Endsem : TBD 
+ 
+Overall Verdict if there is a slightest of interest in taking a course dealing with MAB and FL, Convex optimization, Convergence Guarantees and more toward Online Machine Learning then this is a course for you...recommended to do basic courses in LA, Probability, ML etc.
+
