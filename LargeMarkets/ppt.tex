@@ -1,0 +1,1041 @@
+\documentclass{beamer}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsthm,amsfonts}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{tikz}
+\usepackage{booktabs}
+
+% ----------------------------------------------------------------------
+% Theme and colour scheme
+% ----------------------------------------------------------------------
+\usetheme{Madrid}
+\usecolortheme{default}
+
+\definecolor{deepblue}{RGB}{25, 70, 150}
+\definecolor{accent}{RGB}{220, 20, 60}
+\definecolor{lightgray}{RGB}{240, 240, 245}
+\definecolor{darkgray}{RGB}{60, 60, 60}
+
+\setbeamercolor{palette primary}{bg=deepblue, fg=white}
+\setbeamercolor{palette secondary}{bg=accent, fg=white}
+\setbeamercolor{palette tertiary}{bg=deepblue, fg=white}
+\setbeamercolor{frametitle}{bg=deepblue, fg=white}
+\setbeamercolor{title}{fg=deepblue}
+\setbeamercolor{alerted text}{fg=accent}
+\setbeamercolor{itemize item}{fg=deepblue}
+\setbeamercolor{itemize subitem}{fg=accent}
+\setbeamercolor{block title}{bg=deepblue, fg=white}
+\setbeamercolor{block body}{bg=lightgray}
+\setbeamercolor{title}{bg=deepblue, fg=white}
+\setbeamercolor{subtitle}{bg=deepblue, fg=white}
+
+% ----------------------------------------------------------------------
+% Theorem environments (no conflict with amsthm)
+% ----------------------------------------------------------------------
+\theoremstyle{definition}
+\newtheorem*{defn}{Definition}
+\newtheorem*{assumption}{Assumption}
+\newtheorem*{mylemma}{Lemma}
+\newtheorem*{mytheorem}{Theorem}
+\newtheorem*{mycor}{Corollary}
+\newtheorem*{myprop}{Proposition}
+
+% ----------------------------------------------------------------------
+% Custom commands
+% ----------------------------------------------------------------------
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\argmax}{\operatorname*{argmax}}
+\newcommand{\argmin}{\operatorname*{argmin}}
+\newcommand{\norm}[1]{\left\lVert#1\right\rVert}
+\newcommand{\abs}[1]{\left\lvert#1\right\rvert}
+\newcommand{\inner}[2]{\langle #1, #2\rangle}
+
+% ----------------------------------------------------------------------
+% Title page information
+% ----------------------------------------------------------------------
+\title[Large Markets]{Competing Bandits in Decentralized Contextual Matching Markets}
+\subtitle{Learning Environments and Stable Matchings with Logarithmic Regret}
+\author[Team 12]{Paper by: Satush Parikh, Soumya Basu, Avishek Ghosh,\\
+Abishek Sankararaman \\[0.5cm]
+\small Presented by: Team 12 CS6007 \\ Sarthak Mishra \& Abhimanyu Singh Rathore}
+\institute{arXiv:2411.11794v2}
+\date{November 7, 2025}
+
+% ----------------------------------------------------------------------
+% Document
+% ----------------------------------------------------------------------
+\begin{document}
+
+% ----------------------------------------------------------------------
+% Title page
+% ----------------------------------------------------------------------
+\begin{frame}
+  \titlepage
+\end{frame}
+
+% ----------------------------------------------------------------------
+% Table of contents
+% ----------------------------------------------------------------------
+\begin{frame}
+  \frametitle{Table of Contents}
+  \tableofcontents
+\end{frame}
+
+% ----------------------------------------------------------------------
+% SECTION 1: INTRODUCTION AND MOTIVATION
+% ----------------------------------------------------------------------
+\section{Introduction and Motivation}
+
+\begin{frame}
+  \frametitle{Matching Markets: Classical Context}
+  \begin{itemize}
+    \item \textbf{Definition}: Two‑sided markets with $N$ agents (workers) and $K$ arms (tasks/items).
+    \item \textbf{Classical Model} (Gale–Shapley 1962): Agents and arms have fixed, known preference rankings.
+    \item \textbf{Goal}: Achieve \emph{stable matching} where no agent–arm pair prefers each other over current matches.
+    \item \textbf{Real‑world Applications}:
+    \begin{itemize}
+      \item School admissions, organ transplants, job matching
+      \item Amazon Mechanical Turk, TaskRabbit, UpWork, Jobble
+    \end{itemize}
+    \item \textbf{Challenge in Modern Platforms}: Agents do not know preferences a priori; they must learn through interaction.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Modern Learning Markets}
+  \begin{columns}[T]
+    \column{0.5\textwidth}
+    \textbf{One‑Sided Learning:}
+    \begin{itemize}
+      \item Agents learn preferences
+      \item Arms have fixed preferences
+      \item Typical in gig economy
+    \end{itemize}
+    \column{0.5\textwidth}
+    \textbf{Challenges Addressed:}
+    \begin{itemize}
+      \item Decentralized decisions
+      \item No central coordinator
+      \item Collision resolution
+      \item Time‑varying preferences
+    \end{itemize}
+  \end{columns}
+  \vspace{1cm}
+  \textbf{Motivating Example}: Amazon Mechanical Turk
+  \begin{itemize}
+    \item Task rewards vary with product releases or demand
+    \item Workers need to detect temporal variability
+    \item Should adapt preferences to maximise reward
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Technical Foundations: Linear Contextual Bandits}
+  \begin{defn}[Linear Contextual Bandit Model]
+    For each agent $i$:
+    \begin{itemize}
+      \item Latent parameter $\theta_i\in\R^d$ (agent‑specific)
+      \item Feature vector $\mathbf{x}_{i,j}(t)\in\R^d$ (agent–arm pair at time $t$)
+      \item Expected reward: $\mu_{i,j}(t)=\inner{\mathbf{x}_{i,j}(t)}{\theta_i}$
+      \item Observed reward: $r_i(t)=\mu_{i,j}(t)+\eta_i(t)$, $\eta_i(t)$ sub‑Gaussian (e.g. $\mathcal N(0,1)$)
+    \end{itemize}
+  \end{defn}
+  \textbf{Advantages}
+  \begin{itemize}
+    \item Regret independent of the number of arms $K$ (crucial for large markets)
+    \item Only need to learn the low‑dimensional $\theta_i$
+    \item Enables feature‑based preference modelling
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Non‑Stationarity via Latent Environments}
+  \begin{block}{The Challenge}
+    If feature vectors change arbitrarily, agents need $N^2$ rounds to relearn stable matchings (via Gale–Shapley), leading to linear regret.
+  \end{block}
+  \begin{solution}[Latent Environment Structure]
+    Introduce a finite set $\mathcal E$ of size $E$ representing latent environments:
+    \begin{itemize}
+      \item Each environment characterises preference rankings.
+      \item Feature vectors change within and across environments.
+      \item Agents infer the active environment from observed features and learned $\theta_i$.
+      \item Small feature perturbations within an environment $\Rightarrow$ consistent rankings.
+    \end{itemize}
+  \end{solution}
+\end{frame}
+
+% ----------------------------------------------------------------------
+% SECTION 2: PROBLEM FORMULATION
+% ----------------------------------------------------------------------
+\section{Problem Formulation}
+
+\begin{frame}
+  \frametitle{Two‑Sided Matching Market Setup}
+  \begin{defn}[Contextual Matching Market]
+    \begin{itemize}
+      \item $N$ agents, $K$ arms ($K\ge N$), horizon $T$.
+      \item At each round $t$, an \emph{active environment} $e(t)\in\mathcal E$ (latent to agents).
+      \item Each agent $i$ proposes one arm $m_i(t)$.
+      \item Each arm has a fixed preference ranking over agents.
+      \item On a collision the arm selects its most‑preferred agent.
+      \item Unmatched agents receive zero reward.
+      \item Matched agent $i$ with arm $j$ receives
+        $r_i(t)=\inner{\mathbf{x}_{i,j}(t)}{\theta_i}+\eta_i(t)$.
+    \end{itemize}
+  \end{defn}
+  \begin{block}{Decentralised Setting}
+    Agents make independent decisions without a central coordinator. Communication is only via a shared information board (standard in recent literature).
+  \end{block}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Stable Matching Concept}
+  \begin{defn}[Stable Matching]
+    A matching is \emph{stable} if no agent–arm pair mutually prefers each other over their current matches (no blocking pairs).
+  \end{defn}
+  \begin{theorem}[Gale–Shapley, 1962]
+    The Gale–Shapley algorithm with deferred acceptance produces:
+    \begin{enumerate}
+      \item A stable matching for any market.
+      \item The unique \emph{agent‑optimal} stable matching.
+      \item Convergence in at most $N^2-2N+2$ rounds.
+    \end{enumerate}
+  \end{theorem}
+  \textbf{Key Challenge}: Agents do not know true preferences until learning $\theta_i$; preferences change across environments.
+\end{frame}
+
+\begin{frame}
+  \frametitle{Environment Definition and Assumption 1}
+  \begin{defn}[Environment]
+    An environment $e\in\mathcal E$ specifies:
+    \begin{itemize}
+      \item Ranking $\rho_i^{e}\in\R^K$ for each agent $i$ over all arms.
+      \item Fixed ranking of all agents for each arm.
+      \item The environment $e(t)$ active at time $t$ is unknown to agents.
+    \end{itemize}
+  \end{defn}
+  \begin{assumption}[Environment Structure]
+    For any two distinct environments $e,e'\in\mathcal E$,
+    \[
+      \rho_i^{e}[1\!:\!N]\neq\rho_i^{e'}[1\!:\!N]\qquad\forall i\in[N].
+    \]
+    The top‑$N$ preferences of each agent must be distinct across environments.
+  \end{assumption}
+  \textbf{Justification}: Without distinct rankings, cycles prevent convergence (example with serial dictatorship in the paper).
+\end{frame}
+
+\begin{frame}
+  \frametitle{Regret Definition}
+  \begin{defn}[Cumulative Expected Regret]
+    For agent $i$,
+    \[
+      \E\!\bigl[R_T^{(i)}\bigr]
+      =\E\!\left[\sum_{t=1}^{T}
+        \bigl(\mu_{i,m_i^{*}(e(t))}(t)-\mu_{i,m_i(t)}(t)\bigr)\right],
+    \]
+    where
+    \begin{itemize}
+      \item $e(t)$ = active environment at time $t$,
+      \item $m_i^{*}(e(t))$ = agent $i$’s arm in the \emph{agent‑optimal} stable matching for $e(t)$,
+      \item $m_i(t)$ = arm actually matched with $i$ at time $t$.
+    \end{itemize}
+  \end{defn}
+  \textbf{Objective}: Minimise cumulative regret for all agents over $T$ rounds.
+\end{frame}
+
+\begin{frame}
+  \frametitle{Minimum Reward Gap}
+  \begin{defn}[Minimum Gap]
+    For agent $i$ at time $t$,
+    \[
+      \Delta_{\min,i}(t)=\min_{\substack{j\in\text{Top}_i(N+1)\\
+                                   j'\notin\text{Top}_i(N+1)}}
+        \bigl|\inner{\mathbf{x}_{i,j}(t)-\mathbf{x}_{i,j'}(t)}{\theta_i}\bigr|.
+    \]
+    Globally,
+    \[
+      \Delta_{\min}= \min_{i,t}\Delta_{\min,i}(t).
+    \]
+    $\text{Top}_i(N+1)$ denotes the top $N\!+\!1$ arms for agent $i$ in the current ranking.
+  \end{defn}
+  \textbf{Interpretation}: Minimum margin between the $(N\!+\!1)$‑st best arm and the $(N\!+\!2)$‑nd best arm; determines identifiability of the top‑$N$ arms.
+\end{frame}
+
+% ----------------------------------------------------------------------
+% SECTION 3: ALGORITHM 1 – ETP‑GS
+% ----------------------------------------------------------------------
+\section{Algorithm 1: Environment‑Triggered Phased Gale‑Shapley (ETP‑GS)}
+
+\begin{frame}
+  \frametitle{Key Algorithmic Ideas}
+  \begin{enumerate}
+    \item \textbf{Round‑Robin Exploration}: Avoid collisions during the learning phase.
+    \item \textbf{Least‑Squares Estimation}: Estimate $\theta_i$ from the exploration phase.
+    \item \textbf{Confidence Intervals}: UCB/LCB for top‑$N$ arm identification.
+    \item \textbf{Environment Detection}: Detect when the top‑$N$ arms change (new environment).
+    \item \textbf{Gale‑Shapley Matching}: Execute GS once the top‑$N$ arms are identified.
+    \item \textbf{Re‑triggering}: Restart exploration if the environment changes.
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Least Squares Estimation }
+  \begin{defn}[LS Estimate and Design Matrix]
+    \begin{align}
+      V_i(t) &= \sum_{s=1}^{t}\mathbf{x}_{i,m_i(s)}(s)\mathbf{x}_{i,m_i(s)}^{\!\top}(s) \quad\text{(design matrix)}\\[2mm]
+      \hat\theta_i(t) &= V_i(t)^{-1}\!\sum_{s=1}^{t} r_i(s)\,\mathbf{x}_{i,m_i(s)}(s) \quad\text{(LS estimate)}\\[2mm]
+      \hat\mu_{i,j}(t) &= \inner{\hat\theta_i(t)}{\mathbf{x}_{i,j}(t)} \quad\text{(estimated reward)}.
+    \end{align}
+  \end{defn}
+\end{frame}
+
+\begin{frame}{Confidence Intervals}
+    \begin{defn}[Upper/Lower Confidence Bounds]
+    \begin{align}
+      \text{UCB}_{i,j}(t) &= \hat\mu_{i,j}(t)+w_i\!\bigl(t,\mathbf{x}_{i,j}(t)\bigr),\\
+      \text{LCB}_{i,j}(t) &= \hat\mu_{i,j}(t)-w_i\!\bigl(t,\mathbf{x}_{i,j}(t)\bigr),\\[1mm]
+      w_i(t,\mathbf{x}) &= \sum_{\ell=1}^{d}
+        \bigl|\inner{\mathbf{x}}{v_\ell}\bigr|
+        \sqrt{2\,\|v_\ell\|_{V_i(t)^{-1}}^{2}\,\log t^{2}},
+    \end{align}
+    where $\{v_\ell\}_{\ell=1}^{d}$ is any orthonormal basis of $\R^{d}$.
+  \end{defn}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Top‑$N$ Arms Identification Condition}
+  \begin{defn}[Top‑$N$ Arms Identification]
+    Agent $i$ identifies its top‑$N$ arms at time $t$ if
+    \[
+      \forall a\in[N]:\;
+      \text{LCB}_{i,\sigma(a)}(t) >
+      \max_{c:\,\sigma(a+1)\le c\le\sigma(K)}\text{UCB}_{i,c}(t),
+    \]
+    where $\sigma:[K]\to[K]$ is the permutation that orders the arms according to the true ranking.
+  \end{defn}
+  \textbf{Key Insight}: Once the confidence intervals for the top‑$N$ arms do not overlap with any lower‑ranked arm, the ranking is known with high probability.
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Algorithm 1: ETP‑GS (Pseudo‑code)}
+  \begin{algorithm}[H]
+    \tiny
+    \caption{ETP‑GS: Environment‑Triggered Phased Gale‑Shapley}
+    \begin{algorithmic}[1]
+      \State \textbf{Initialize}: $D[\cdot]\gets\{\}$, $\tau_{\text{end}}\gets0$, $l\gets0$, $B\gets1$
+      \For{$t\ge1$}
+        \State $B\gets1$ \Comment{Environment Recovery}
+        \If{$\sigma_i(t)\neq\emptyset$}
+          \If{$\sigma_i(t)\notin\{\sigma_i[e]:e\in D\}$}
+            \State Add new environment: $D[e^{*}]\gets(1,\sigma_i(t))$
+          \EndIf
+          \State $e_i(t)\gets e$ such that $\sigma_i[e]=\sigma_i(t)$
+        \Else
+          \State $B\gets B\land0$
+        \EndIf
+
+        \If{$B=0\land t>\tau_{\text{end}}$}   \Comment{Exploration Triggering}
+          \State $\tau_{\text{end}}\gets t+2^{l}$, $l\gets l+1$
+        \EndIf
+
+        \If{$t\le\tau_{\text{end}}$}   \Comment{Exploration Phase}
+          \State $m_i(t)\gets ((i+t)\bmod K)+1$   \Comment{Round‑robin}
+          \State Observe $r_i(t)$, update $\hat\theta_i(t)$, UCB, LCB
+        \Else   \Comment{Exploitation: GS Matching}
+          \State Retrieve $(s,\sigma)=D[e_i(t)]$
+          \State $m_i(t)\gets\sigma[s]$
+          \If{$m_i(t)=\phi$}
+            \State Update $D[e_i(t)]\gets(s+1,\sigma)$
+          \EndIf
+        \EndIf
+      \EndFor
+    \end{algorithmic}
+  \end{algorithm}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Assumption 2: Full‑Rank Feature Vectors}
+  \begin{assumption}[Full‑Rank Feature Vectors]
+    For each agent $i$, the arms $[K]$ can be partitioned into non‑overlapping groups of $d$ distinct arms
+    $\mathcal G=\{G_{1},\dots,G_{\lfloor K/d\rfloor}\}$ such that for any group $G\in\mathcal G$ and any
+    $\{t_{1},\dots,t_{d}\}\subseteq[T]$,
+    \[
+      \lambda_{\min}\!\Bigl(\sum_{j=1}^{d}\mathbf{x}_{i,G(j)}(t_{j})
+        \mathbf{x}_{i,G(j)}^{\!\top}(t_{j})\Bigr)\ge\kappa>0 .
+    \]
+  \end{assumption}
+  \textbf{Intuition}
+  \begin{itemize}
+    \item Guarantees that the design matrix is well‑conditioned.
+    \item Ensures confidence intervals shrink at the usual $1/\sqrt{t}$ rate.
+    \item Weaker than requiring all $K$ feature vectors to be linearly independent.
+  \end{itemize}
+\end{frame}
+
+% ----------------------------------------------------------------------
+% SECTION 4: THEORETICAL ANALYSIS – KEY LEMMAS
+% ----------------------------------------------------------------------
+\section{Theoretical Analysis – Key Lemmas}
+
+\begin{frame}
+  \frametitle{Lemma 1: Concentration Bound}
+  \begin{lemma}[Concentration for Least‑Squares Estimate]
+    Under Assumption 2, with round‑robin exploration and $\|\mathbf{x}\|\le L$,
+    for $t\ge d$,
+    \[
+      \|\mathbf{x}\|_{V_i(t)^{-1}}
+      \le\sqrt{L\,\frac{d}{\kappa\,\mathcal T(t)}},
+    \]
+    where $\mathcal T(t)$ is the cumulative number of exploration pulls and
+    $\|\mathbf{x}\|_{A}=\sqrt{\mathbf{x}^{\!\top}A\mathbf{x}}$.
+  \end{lemma}
+  \textbf{Proof Idea}
+  \begin{itemize}
+    \item Apply a self‑normalised concentration inequality (e.g. Abbasi‑Yadkori et al., 2011).
+    \item Round‑robin guarantees each group $G$ is sampled regularly, giving the eigenvalue lower bound $\kappa$.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Lemma 2: Confidence Width Shrinkage}
+  \begin{lemma}[Confidence Width]
+    Conditional on the good event,
+    \[
+      w_{i,j}(t)\le 2dL\sqrt{\frac{\log t}{\kappa\,\mathcal T(t)}} .
+    \]
+  \end{lemma}
+  \textbf{Proof Sketch}
+  \begin{itemize}
+    \item Use Lemma 1 to bound $\|\mathbf{x}_{i,j}(t)\|_{V_i(t)^{-1}}$.
+    \item Plug the bound into the definition of $w_i(\cdot)$.
+    \item The width shrinks as $1/\sqrt{\mathcal T(t)}$.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Lemma 3: UCB/LCB Consistency}
+  \begin{lemma}[Upper/Lower Confidence Bound Consistency]
+    Conditional on the good event,
+    \[
+      \text{UCB}_{i,j}(t)<\text{LCB}_{i,j'}(t)
+      \;\Longrightarrow\;
+      \mu_{i,j}(t)<\mu_{i,j'}(t)
+    \]
+    for all arms $j,j'$.
+  \end{lemma}
+  \textbf{Proof Idea}
+  \begin{itemize}
+    \item The good event guarantees $|\mu_{i,j}(t)-\hat\mu_{i,j}(t)|\le w_{i,j}(t)$.
+    \item If $\text{UCB}_{i,j}<\text{LCB}_{i,j'}$, then
+      $\hat\mu_{i,j}+w_{i,j}<\hat\mu_{i,j'}-w_{i,j'}$,
+      which implies $\mu_{i,j}<\mu_{i,j'}$.
+  \end{itemize}
+  \textbf{Corollary}: Once the top‑$N$ arms satisfy the identification condition, the agent’s ranking is correct with high probability.
+\end{frame}
+
+\begin{frame}
+  \frametitle{Lemma 4: Top‑$N$ Arms Identification Time}
+  \begin{lemma}[Top‑$N$ Arms Identification]
+    Conditional on the good event, agent $i$ identifies its top‑$N$ arms once
+    \[
+      \Delta_{\min,i}(t)\ge
+      8Ld\sqrt{\frac{\log t}{\kappa\,\mathcal T(t)}} .
+    \]
+    Equivalently, after at most
+    \[
+      \mathcal T_{\text{identify}}
+      = O\!\left(\frac{d^{2}L^{2}\log T}{\kappa\,\Delta_{\min,i}^{2}}\right)
+    \]
+    exploration pulls.
+  \end{lemma}
+  \textbf{Proof Sketch}
+  \begin{itemize}
+    \item The identification condition requires
+      $\text{LCB}_{i,\sigma(N)}>\text{UCB}_{i,\sigma(N+1)}$.
+    \item Using Lemma 2, this holds when the confidence width is smaller than the minimum gap $\Delta_{\min,i}(t)$.
+    \item Solve for $\mathcal T(t)$ to obtain the bound.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Lemma 5: Gale‑Shapley Convergence}
+  \begin{lemma}[Gale‑Shapley Steps]
+    Once every agent has correctly identified its top‑$N$ arms for a given environment,
+    the Gale‑Shapley deferred‑acceptance procedure reaches a stable matching in at most
+    $N^{2}-2N+2$ proposals.
+  \end{lemma}
+  \textbf{Proof Reference}: Classical analysis of the Gale‑Shapley algorithm (Gale \& Shapley, 1962).
+\end{frame}
+
+\begin{frame}
+  \frametitle{Lemma 6: Bad‑Event Probability}
+  \begin{lemma}[High‑Probability Bound]
+    The total expected number of rounds in which the concentration bounds fail satisfies
+    \[
+      \E\!\Bigl[\sum_{t=1}^{T}\mathbf 1\{\text{bad event at }t\}\Bigr]
+      \le \frac{Nd\pi^{2}}{3}.
+    \]
+  \end{lemma}
+  \textbf{Proof Idea}
+  \begin{itemize}
+    \item Apply the self‑normalised concentration inequality with a $1/t^{2}$ tail.
+    \item Union‑bound over $N$ agents and $d$ dimensions.
+    \item $\sum_{t=1}^{\infty}1/t^{2}=\pi^{2}/6$ gives the constant.
+  \end{itemize}
+  \textbf{Implication}: Regret incurred due to bad events is $O(1)$, not $O(T)$.
+\end{frame}
+
+\begin{frame}
+  \frametitle{Lemma 7: Dominant Regret Term}
+  \begin{lemma}[Event $\mathcal E_{3}(t)$ Timing]
+    Conditional on the good event, the event $\neg\mathcal E_{3}(t)$ (top‑$N$ arms not yet identified) can only occur while
+    \[
+      \mathcal T(t)<\frac{64d^{2}L^{2}\log T}{\kappa\,\Delta_{\min}^{2}} .
+    \]
+  \end{lemma}
+  \textbf{Interpretation}
+  \begin{itemize}
+    \item After $\tau_{*}=64d^{2}L^{2}\log T/(\kappa\Delta_{\min}^{2})$ exploration pulls, every agent has identified its top‑$N$ arms with high probability.
+    \item The algorithm then switches to the Gale‑Shapley exploitation phase.
+  \end{itemize}
+\end{frame}
+
+% ----------------------------------------------------------------------
+% SECTION 5: MAIN THEOREM AND REGRET BOUNDS
+% ----------------------------------------------------------------------
+\section{Main Results – Regret Bounds}
+
+\begin{frame}
+  \frametitle{Theorem 1: ETP‑GS Regret Bound}
+  \begin{theorem}[ETP‑GS Regret]
+    Under Assumptions 1 and 2, the cumulative expected regret for agent $i$ satisfies
+    \[
+      \boxed{
+        \E\!\bigl[R_T^{(i)}\bigr]
+        \le
+        \Bigl(\tfrac{64d^{2}L^{2}\log T}{\kappa\,\Delta_{\min}^{2}}
+              + EN^{2}
+              + \tfrac{Nd\pi^{2}}{3}\Bigr)\,\mu_{i,\max}
+      } .
+    \]
+    Here $\mu_{i,\max}=\max_{j,t}\mu_{i,j}(t)$.
+  \end{theorem}
+  \textbf{Proof Sketch}
+  \begin{enumerate}
+    \item \textbf{Exploration}: Lemma 7 gives $O\!\bigl(d^{2}L^{2}\log T/(\kappa\Delta_{\min}^{2})\bigr)$ rounds of sub‑optimal play.
+    \item \textbf{Exploitation (GS)}: Lemma 5 contributes at most $EN^{2}$ rounds of regret (one GS run per environment).
+    \item \textbf{Bad events}: Lemma 6 contributes $O(1)$ regret.
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Regret Bound Scaling}
+  \begin{columns}[T]
+    \column{0.5\textwidth}
+    \textbf{Term 1: Exploration}
+    \[
+      \frac{64d^{2}L^{2}\log T}{\kappa\,\Delta_{\min}^{2}}
+    \]
+    \begin{itemize}
+      \item Dominant for large horizons.
+      \item Logarithmic in $T$.
+      \item Independent of the number of arms $K$.
+    \end{itemize}
+    \column{0.5\textwidth}
+    \textbf{Term 2: Gale‑Shapley}
+    \[
+      EN^{2}
+    \]
+    \begin{itemize}
+      \item Finite, environment‑dependent term.
+      \item Independent of $T$.
+    \end{itemize}
+  \end{columns}
+  \vspace{0.8cm}
+  \textbf{Overall order}
+  \[
+    \E[R_T^{(i)}]=\tilde O\!\Bigl(\frac{d^{2}}{\Delta_{\min}^{2}}+EN^{2}\Bigr)
+  \]
+  (ignoring logarithmic factors and constants).
+\end{frame}
+
+\begin{frame}
+  \frametitle{Comparison with Single‑Agent Lower Bounds}
+  \begin{theorem}[Linear Contextual Bandit Lower Bound]
+    For any algorithm in the single‑agent linear contextual bandit setting,
+    \[
+      \Omega\!\Bigl(\frac{d}{\Delta_{\min}}\log T\Bigr)
+    \]
+    regret is unavoidable.
+  \end{theorem}
+  \textbf{Interpretation}
+  \begin{itemize}
+    \item Our multi‑agent bound matches the $\log T$ dependence but incurs an extra factor $d/\Delta_{\min}$ due to the need to identify the top‑$N$ arms jointly.
+    \item The $EN^{2}$ term is unavoidable in a changing‑environment setting (each environment may require a new stable matching).
+  \end{itemize}
+\end{frame}
+
+% ----------------------------------------------------------------------
+% SECTION 6: ALGORITHM 2 – IETP‑GS
+% ----------------------------------------------------------------------
+\section{Algorithm 2: Improved ETP‑GS (IETP‑GS)}
+
+\begin{frame}
+  \frametitle{IETP‑GS – Key Improvements}
+  \begin{enumerate}
+    \item \textbf{Partial‑Rank Matching}: Use Kendall‑$\tau$ distance to detect environment changes earlier.
+    \item \textbf{Reward‑Gap Period}: Exploit periods where the reward gap is larger than $\Delta_{\min}$.
+    \item \textbf{Rank‑Based Gap $\Delta_{\min}^{\text{rank}}$}: Often larger than the raw reward gap, leading to fewer exploration rounds.
+    \item \textbf{Improved Constants}: Tighter analysis yields smaller multiplicative factors.
+  \end{enumerate}
+  \textbf{Motivation}: In many practical settings the ordering of arms stabilises long before the exact reward values do.
+\end{frame}
+
+\begin{frame}
+  \frametitle{Kendall‑$\tau$ Distance}
+  \begin{defn}[Inverted Pairs and Kendall‑$\tau$]
+    For two (partial) rankings $\text{pr}$ and $\text{pr}'$,
+    \[
+      \text{Inv}(\text{pr},\text{pr}')
+      =\{(k,j): (k\succ_{\text{pr}}j\land k\prec_{\text{pr}'}j)
+               \lor (k\prec_{\text{pr}}j\land k\succ_{\text{pr}'}j)\}.
+    \]
+    The Kendall‑$\tau$ distance is
+    \[
+      \text{KT}(\text{pr},\text{pr}')=|\text{Inv}(\text{pr},\text{pr}')|.
+    \]
+  \end{defn}
+  \textbf{Use in IETP‑GS}
+  \begin{itemize}
+    \item When the partial ranking inferred from the current confidence intervals matches an existing environment (i.e. $\text{KT}=0$), we can immediately switch to the corresponding Gale‑Shapley phase.
+    \item This avoids waiting for the full reward gap to become large.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Reward‑Gap Period}
+  \begin{defn}[Reward‑Gap Period $P_{e}(\Delta)$]
+    For environment $e$,
+    \[
+      P_{e}(\Delta)=\max_{i}\max_{\nu_{e}\ge1}
+        \min\bigl\{\delta\nu_{e}:\,
+               \delta\nu_{e}\ge0,\;
+               \Delta_{\min,i}\bigl(t_{e}(\nu_{e}+\delta\nu_{e})\bigr)\ge\Delta\bigr\}.
+    \]
+    Intuitively, $P_{e}(\Delta)$ is the longest stretch (in rounds) needed for the minimum reward gap to reach at least $\Delta$ after the environment $e$ becomes active.
+  \end{defn}
+  \textbf{Key Insight}: By choosing a larger $\Delta$ we may reduce the number of required exploration rounds, at the cost of waiting a (potentially short) gap period.
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Algorithm 2: IETP‑GS (Pseudo‑code)}
+  \begin{algorithm}[H]
+    \tiny
+    \caption{IETP‑GS}
+    \begin{algorithmic}[1]
+      \State \textbf{Initialize}: $D[\cdot]\gets\{\}$, $\tau_{\text{end}}\gets0$, $l\gets0$, $B\gets1$
+      \For{$t\ge1$}
+        \State $B\gets1$ \Comment{Environment Recovery}
+        \State Compute partial ranking $\text{pr}_i(t)$ from $\hat\mu_{i,\cdot}(t)$
+        \If{$\sigma_i(t)\neq\emptyset$ \textbf{or}
+            ($|D|=E$ \textbf{and} $\exists e:\text{KT}(\text{pr}_i(t),\sigma_i[e])=0$)}
+          \If{$\sigma_i(t)\neq\emptyset$ \textbf{and} $\sigma_i(t)\notin D$}
+            \State Add new environment: $D[e^{*}]\gets(1,\sigma_i(t))$
+          \EndIf
+          \State Retrieve or set $e_i(t)$ (environment index)
+        \Else
+          \State $B\gets B\land0$
+        \EndIf
+
+        \If{$B=0\land t>\tau_{\text{end}}$}
+          \State $\tau_{\text{end}}\gets t+2^{l}$, $l\gets l+1$
+        \EndIf
+
+        \If{$t\le\tau_{\text{end}}$}   \Comment{Exploration Phase}
+          \State $m_i(t)\gets ((i+t)\bmod K)+1$   \Comment{Round‑robin}
+          \State Observe $r_i(t)$, update $\hat\theta_i(t)$, UCB, LCB
+        \Else   \Comment{Exploitation: GS Matching}
+          \State Retrieve $(s,\sigma)=D[e_i(t)]$
+          \State $m_i(t)\gets\sigma[s]$
+          \If{$m_i(t)=\phi$}
+            \State Update $D[e_i(t)]\gets(s+1,\sigma)$
+          \EndIf
+        \EndIf
+      \EndFor
+    \end{algorithmic}
+  \end{algorithm}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Key Lemmas for IETP‑GS}
+  \begin{lemma}[First Exploration Phase Length]
+    Conditional on the good event,
+    \[
+      \neg\mathcal E_{0}(t)\cap\neg\mathcal E_{1}(t)
+      \text{ occurs for at most }
+      \min_{\Delta>0}\Bigl(\tau(\Delta)+\sum_{e}P_{e}(\Delta)\Bigr)
+    \]
+    rounds, where $\tau(\Delta)=\frac{64d^{2}L^{2}\log T}{\kappa\Delta^{2}}$.
+  \end{lemma}
+  \begin{lemma}[Additional Exploration Phases]
+    Conditional on the good event,
+    \[
+      \mathcal E_{1}(t)\cap\neg\mathcal E_{2}(t)
+      \text{ occurs for at most }
+      g\!\Bigl(\tfrac{64L^{2}d^{2}\log T}{\Delta_{\min}^{\text{rank}2}}\Bigr)
+    \]
+    rounds, where $g(\cdot)$ is a polynomial.
+  \end{lemma}
+\end{frame}
+
+\begin{frame}{Key Lemmas for IETP‑GS Contd...}
+     \begin{lemma}[Environment Identification Error]
+    Conditional on the good event, the total number of rounds in which the algorithm mis‑identifies the active environment is bounded by $EN^{2}$.
+  \end{lemma}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Theorem 2: IETP‑GS Regret Bound}
+  \begin{theorem}[IETP‑GS Regret]
+    Under Assumptions 1 and 2,
+    \[
+      \boxed{
+        \E\!\bigl[R_T^{(i)}\bigr]\le
+        \Bigl(
+          \min_{\Delta>0}\!\Bigl(\tfrac{64d^{2}L^{2}\log T}{\kappa\Delta^{2}}
+                               +\sum_{e}P_{e}(\Delta)\Bigr)
+          +g\!\Bigl(\tfrac{64L^{2}d^{2}\log T}{\Delta_{\min}^{\text{rank}2}}\Bigr)
+          +EN^{2}
+          +\tfrac{Nd\pi^{2}}{3}
+        \Bigr)\mu_{i,\max}
+      } .
+    \]
+  \end{theorem}
+  \textbf{Improvements over Theorem 1}
+  \begin{itemize}
+    \item The minimisation over $\Delta$ allows the algorithm to exploit larger reward gaps when they appear.
+    \item The rank‑based gap $\Delta_{\min}^{\text{rank}}$ can be substantially larger than $\Delta_{\min}$, reducing the dominant exploration term.
+    \item The $P_{e}(\Delta)$ term captures the (often short) waiting time needed for a gap of size $\Delta$ to materialise.
+  \end{itemize}
+\end{frame}
+
+% ----------------------------------------------------------------------
+% SECTION 7: PIECEWISE‑STATIONARY PARAMETERS
+% ----------------------------------------------------------------------
+\section{Extension – Piecewise‑Stationary Parameters}
+
+\begin{frame}
+  \frametitle{Beyond Fixed Parameters: Piecewise‑Stationary Model}
+  \begin{block}{Challenge}
+    Agent parameters $\theta_i$ may evolve over time (e.g. career changes, seasonal effects).
+  \end{block}
+  \begin{solution}[Piecewise‑Stationary Assumption]
+    \begin{itemize}
+      \item There exist change‑points $0<\tau_{1}<\tau_{2}<\dots<\tau_{\gamma_T}<T$.
+      \item Within each interval $[\tau_{k},\tau_{k+1})$, the vector $\theta_i$ is fixed.
+      \item The number of changes $\gamma_T$ may grow with $T$ (but slowly).
+    \end{itemize}
+  \end{solution}
+  \textbf{Motivation}: Workers’ skills, task rewards, or platform policies often shift in a piecewise‑constant fashion.
+\end{frame}
+
+\begin{frame}
+  \frametitle{Algorithm 3: CD‑ETP‑GS (Change‑Detection)}
+  \begin{block}{Idea}
+    Combine IETP‑GS with a statistical change‑detection test (e.g. CUSUM) on the residuals of the LS estimator.
+  \end{block}
+  \begin{defn}[CUSUM Statistic]
+    \[
+      S_t=\max\bigl(0,\,S_{t-1}+ \ell_t-\mu-\beta\bigr),
+    \]
+    where $\ell_t$ is the log‑likelihood ratio of the new observation, $\mu$ a reference mean, and $\beta>0$ a threshold.
+    A change is declared when $S_t$ exceeds a pre‑specified level.
+  \end{defn}
+  \textbf{Result}: When a change is detected, the algorithm resets its exploration/exploitation state and starts learning the new $\theta_i$.
+\end{frame}
+
+\begin{frame}[fragile]
+  \frametitle{Algorithm 3: CD‑ETP‑GS (Pseudo‑code)}
+  \begin{algorithm}[H]
+    \small
+    \caption{CD‑ETP‑GS: Change‑Detection aided ETP‑GS}
+    \begin{algorithmic}[1]
+      \State \textbf{Initialize}: CUSUM detector, $\hat\tau\gets0$, IETP‑GS state.
+      \For{$t'=1$ \textbf{to} $T$}
+        \State $t\gets t'-\hat\tau$ \Comment{Local time in current segment}
+        \State $\mathcal{CD}\gets1$
+        \If{CD.IsForcedExploration($t$)}
+          \State Play round‑robin exploration, observe $r_i(t)$.
+          \State Update LS estimate and CUSUM statistic.
+          \If{$S_t$ exceeds threshold}
+            \State $\mathcal{CD}\gets0$ \Comment{Change detected}
+          \EndIf
+          \If{$\mathcal{CD}=0$}
+            \State $\hat\tau\gets t'$; clear $D$, reset $\theta_i$, UCB/LCB, etc.
+          \EndIf
+        \Else
+          \State Run IETP‑GS (business as usual).
+        \EndIf
+      \EndFor
+    \end{algorithmic}
+  \end{algorithm}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Theorem 3: Regret with Piecewise‑Stationarity}
+  \begin{theorem}[CD‑ETP‑GS Regret]
+    Let $\gamma_T$ be the number of change‑points. Then for each agent $i$,
+    \[
+      \E\!\bigl[R_T^{(i)}\bigr]
+      =\tilde O\!\Bigl(
+          L\sqrt{\gamma_T T\log\!\frac{NT}{\gamma_T}}
+          \;+\;
+          2\gamma_T\,
+          \text{Regret}^{(i)}\!\bigl(T/\gamma_T;\text{IETP‑GS}\bigr)
+        \Bigr).
+    \]
+  \end{theorem}
+  \textbf{Interpretation}
+  \begin{itemize}
+    \item The first term is the cost of detecting and adapting to changes (sub‑linear in $T$ as long as $\gamma_T=o(T)$).
+    \item The second term is the sum of the regrets incurred in each stationary segment (each segment behaves like the static case analysed for IETP‑GS).
+    \item If $\gamma_T=O(1)$, the overall regret matches the static bound up to logarithmic factors.
+  \end{itemize}
+\end{frame}
+
+% ----------------------------------------------------------------------
+% SECTION 8: PRACTICAL CONSIDERATIONS
+% ----------------------------------------------------------------------
+\section{Practical Considerations}
+
+\begin{frame}
+  \frametitle{Computational Complexity}
+  \begin{table}[h]
+    \centering
+    \small
+    \begin{tabular}{l|l|l}
+      \toprule
+      Component & Complexity per round & Remarks \\
+      \midrule
+      Round‑robin selection & $O(1)$ & Simple arithmetic \\
+      LS update & $O(d^{2})$ (Sherman–Morrison) & Inverse update can be done incrementally \\
+      UCB/LCB computation & $O(d^{2})$ per arm & Cached $V_i^{-1}$ helps \\
+      Top‑$N$ sorting & $O(K\log K)$ & Only needed when checking identification \\
+      Environment lookup & $O(\log E)$ & Hash table / map \\
+      Gale‑Shapley step & $O(N)$ & One proposal per active agent \\
+      \midrule
+      \multicolumn{3}{c}{\textbf{Dominant cost:} $O(d^{2}+K\log K)$ (usually $d\ll K$)} \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+  \textbf{Speed‑up tricks}
+  \begin{itemize}
+    \item Incremental matrix inversion (Sherman–Morrison) reduces LS update to $O(d^{2})$.
+    \item Update UCB/LCB only for arms whose features changed.
+    \item Run Gale‑Shapley only when a new environment is detected.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Relaxing Assumption 2}
+  \begin{block}{Full‑Rank Requirement}
+    Assumption 2 guarantees a uniform lower bound $\kappa$ on the smallest eigenvalue of the design matrix.
+  \end{block}
+  \begin{itemize}
+    \item \textbf{Random features}: If $\mathbf{x}_{i,j}(t)$ are i.i.d. from a distribution with full‑rank covariance, the condition holds w.h.p. (by concentration of random matrices).
+    \item \textbf{Block designs}: It suffices that each \emph{group} of $d$ arms is sampled regularly (as already enforced by the round‑robin schedule).
+    \item \textbf{Heteroskedastic noise}: Recent work (e.g. Lumbreras \& Tomamichel, 2024) shows that logarithmic regret can be achieved without a strict spectral gap, at the price of larger constants.
+  \end{itemize}
+  \textbf{Practical tip}: Verify the condition empirically on a pilot dataset; if violated, increase the exploration frequency for poorly‑conditioned arms.
+\end{frame}
+
+\begin{frame}
+  \frametitle{Related Work and Open Questions}
+  \begin{columns}[T]
+    \column{0.5\textwidth}
+    \textbf{Related Areas}
+    \begin{itemize}
+      \item Gale–Shapley with bandit feedback (Liu et al., 2020; Kong \& Li, 2023).
+      \item Latent bandits and contextual matching (Hong et al., 2020).
+      \item Linear contextual bandits (OFUL, Abbasi‑Yadkori et al., 2011).
+      \item Multi‑agent learning and decentralized decision making.
+    \end{itemize}
+    \column{0.5\textwidth}
+    \textbf{Open Questions}
+    \begin{itemize}
+      \item Two‑sided learning (both agents and arms learn).
+      \item Continuous (non‑finite) environment spaces.
+      \item Removing the spectral assumption completely.
+      \item Communication‑efficient decentralised protocols.
+      \item Complementary (rather than identical) preferences across agents.
+    \end{itemize}
+  \end{columns}
+\end{frame}
+
+% ----------------------------------------------------------------------
+% SECTION 9: CONCLUSION
+% ----------------------------------------------------------------------
+\section{Conclusion}
+
+% \begin{frame}
+%   \frametitle{Summary of Contributions}
+%   \begin{enumerate}
+%     \item \textbf{Problem formulation} of a decentralised contextual matching market with latent, piecewise‑stationary environments.
+%     \item \textbf{Algorithms}
+%       \begin{itemize}
+%         \item ETP‑GS – environment‑triggered phased Gale‑Shapley.
+%         \item IETP‑GS – improved version using partial rankings and reward‑gap periods.
+%         \item CD‑ETP‑GS – extension handling piecewise‑stationary parameters via change detection.
+%       \end{itemize}
+%     \item \textbf{Theoretical guarantees}
+%       \begin{itemize}
+%         \item Logarithmic regret, independent of the number of arms $K$.
+%         \item Instance‑dependent bounds involving $d$, $\Delta_{\min}$ (or $\Delta_{\min}^{\text{rank}}$), and the number of environments $E$.
+%         \item Regret decomposition for piecewise‑stationary settings.
+%       \end{itemize}
+%     \item \textbf{Practical insights}
+%       \begin{itemize}
+%         \item Computationally efficient updates.
+%         \item Discussion of the full‑rank assumption and ways to relax it.
+%         \item Directions for empirical validation on real gig‑economy platforms.
+%       \end{itemize}
+%   \end{enumerate}
+% \end{frame}
+
+% \begin{frame}
+%   \frametitle{Key Take‑aways}
+%   \begin{block}{For Practitioners}
+%     \begin{itemize}
+%       \item Decentralised learning can achieve \emph{stable} matchings with only logarithmic regret.
+%       \item Feature‑based linear models scale to massive arm sets.
+%       \item Detecting environment changes early (via rankings) dramatically reduces exploration.
+%     \end{itemize}
+%   \end{block}
+%   \begin{block}{For Theorists}
+%     \begin{itemize}
+%       \item Combining linear bandits with classic matching theory yields rich new analysis challenges.
+%       \item Latent environments provide a tractable way to model non‑stationarity.
+%       \item Instance‑dependent lower bounds remain an open avenue.
+%     \end{itemize}
+%   \end{block}
+%\end{frame}
+
+
+% ----------------------------------------------------------------------
+% APPENDIX
+% ----------------------------------------------------------------------
+\appendix
+
+\begin{frame}
+  \frametitle{Appendix – Proof Sketch of Theorem 1}
+  \begin{proof}[Regret decomposition]
+    \[
+      \E[R_T^{(i)}]
+      =\underbrace{\text{Exploration regret}}_{\text{Rounds }t\le\tau_{\text{end}}}
+       +\underbrace{\text{Exploitation regret}}_{\text{Rounds }t>\tau_{\text{end}}}.
+    \]
+    \begin{itemize}
+      \item \textbf{Exploration}: By Lemma 7 the algorithm stays in exploration for at most
+        $\frac{64d^{2}L^{2}\log T}{\kappa\Delta_{\min}^{2}}$ rounds; each round incurs at most $\mu_{i,\max}$ regret.
+      \item \textbf{Exploitation}: Lemma 5 guarantees at most $EN^{2}$ rounds of sub‑optimal proposals (one Gale‑Shapley run per environment).
+      \item \textbf{Bad events}: Lemma 6 contributes at most $\frac{Nd\pi^{2}}{3}$ regret.
+    \end{itemize}
+    Adding the three contributions yields the bound stated in the theorem.
+  \end{proof}
+\end{frame}
+
+\begin{frame}
+  \frametitle{Notation Summary}
+  \begin{table}[h]
+    \centering
+    \small
+    \begin{tabular}{l|l}
+      \toprule
+      Symbol & Meaning \\
+      \midrule
+      $N,K,T$ & Number of agents, arms, horizon \\
+      $\theta_i\in\R^{d}$ & Latent parameter of agent $i$ \\
+      $\mathbf{x}_{i,j}(t)\in\R^{d}$ & Feature vector for $(i,j)$ at time $t$ \\
+      $\mu_{i,j}(t)=\inner{\mathbf{x}_{i,j}(t)}{\theta_i}$ & Expected reward \\
+      $m_i(t)$ & Arm matched to agent $i$ at time $t$ \\
+      $e(t)$ & Active environment at time $t$ (latent) \\
+      $\mathcal{E}$ & Set of all environments, $|\mathcal{E}|=E$ \\
+      $\rho_i^{e}$ & Preference ranking of agent $i$ in environment $e$ \\
+      $\hat\theta_i(t)$ & LS estimate of $\theta_i$ \\
+      $V_i(t)$ & Design matrix $\sum_{s\le t}\mathbf{x}_{i,m_i(s)}\mathbf{x}_{i,m_i(s)}^{\!\top}$ \\
+      $\Delta_{\min}$ & Minimum reward gap (Definition 4) \\
+      $P_{e}(\Delta)$ & Reward‑gap period (Definition 6) \\
+      $\text{KT}(\cdot,\cdot)$ & Kendall‑$\tau$ distance (Definition 5) \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+\end{frame}
+
+\begin{frame}
+  \frametitle{References}
+  \begin{thebibliography}{99}
+    \bibitem{GS1962}
+      Gale, D., \& Shapley, L.~S. (1962). College admissions and the stability of marriage.
+      \emph{American Mathematical Monthly}, 69(1), 9–15.
+
+    \bibitem{OFUL2011}
+      Abbasi‑Yadkori, Y., Pál, D., \& Szepesvári, C. (2011). Improved algorithms for linear stochastic bandits.
+      \emph{Advances in Neural Information Processing Systems}.
+
+    \bibitem{Liu2020}
+      Liu, M., et al. (2020). Learning in auctions: Regret of dominant‑strategy mechanisms.
+      \emph{Proceedings of the ACM EC}.
+
+    \bibitem{Kong2023}
+      Kong, D., \& Li, Y. (2023). Incentive‑compatible learning for two‑sided matching markets.
+      \emph{Proceedings of the ACM EC}.
+
+    \bibitem{Sankararaman2021}
+      Sankararaman, A., et al. (2021). A unified framework for two‑agent matching markets.
+      \emph{International Conference on Machine Learning}.
+
+    \bibitem{Hong2020}
+      Hong, L., et al. (2020). Latent bandits.
+      \emph{International Conference on Machine Learning}.
+
+    \bibitem{Lumbreras2024}
+      Lumbreras, A., \& Tomamichel, M. (2024). Heteroskedastic linear bandits.
+      \emph{Conference on Learning Theory}.
+  \end{thebibliography}
+\end{frame}
+
+% -------------------------------------------------
+%  Final “Thank you” slide
+% -------------------------------------------------
+\begin{frame}[plain]               % plain → no headline / footline
+  %--- optional background colour (white is the default) ----------
+  %\setbeamercolor{background canvas}{bg=white}
+  %----------------------------------------------------------------
+
+  \centering
+  \vfill                                 % push content to vertical centre
+
+  %--- big thank‑you text -----------------------------------------
+  {\Huge\color{deepblue}Thank you!}\\[1.2ex]   % deep‑blue, size = Huge
+
+  %--- optional subtitle / tagline ---------------------------------
+  {\large\color{accent}Questions?}\\[2ex]      % accent colour, slightly smaller
+
+  %--- optional contact block (email, website, QR‑code, etc.) -----
+  % \begin{tabular}{c}
+  %   \texttt{your.email@domain.com} \\[0.5ex]
+  %   \url{https://github.com/your‑repo} \\[0.5ex]
+  %   %\includegraphics[height=2.5cm]{qr-code.pdf}   % uncomment if you have a QR‑code
+  % \end{tabular}
+  %----------------------------------------------------------------
+
+  \vfill                                 % push content to vertical centre
+\end{frame}
+
+\end{document}
